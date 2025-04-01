@@ -63,7 +63,7 @@ def fotmob_ip_rotator(matchID):
 
 
 def postgres_connection():
-    sql_username, sql_password, sql_host, sql_port, sql_database = postgres_credentials()
+    sql_username, sql_password, sql_host, sql_port, sql_database = postgres_credentials(file_path)
     connection_string = f'postgresql+psycopg2://{sql_username}:{sql_password}@{sql_host}:{sql_port}/{sql_database}'
     engine = create_engine(connection_string)
 
@@ -79,6 +79,19 @@ def check_existing_matches(engine):
         else:
             last_match = conn.execute(text("SELECT MAX(match_id) FROM dim_match")).scalar()
             return last_match
+        
+
+def fetch_all_season_matches(start_year=2010, end_year=2024):
+    """Fetch all EPL matches from the given range of seasons"""
+    all_matches = []
+    for year in range(start_year, end_year):
+        url = f"https://www.fotmob.com/api/fixtures?id=47&season={year}%2F{year+1}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            matches = response.json()
+            for match in matches:
+                all_matches.append(match['id'])
+    return all_matches
 
 def fetch_match_details(match_id):
     """Fetch details of a given match"""
@@ -94,3 +107,33 @@ def upload_to_gcs(bucket_name, data, destination_blob_name):
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
 
+    # Upload JSON data as a string
+    blob.upload_from_string(json.dumps(data), content_type="application/json")
+    print(f"Uploaded {destination_blob_name} to {bucket_name}")
+
+
+def main():
+    """Orchestrate ETL pipeline"""
+    file_path = os.path.join(os.path.dirname(__file__), '../../.env')
+
+    # Load GCP Credentials
+    GOOGLE_APPLICATION_CREDENTIALS, GCS_BUCKET_NAME = gcp_credentials(file_path)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
+
+    # PostgreSQL Connection
+    engine = postgres_connection(file_path)
+
+    # Check existing data
+    last_match_id = check_existing_matches(engine)
+
+    # Fetch matches
+    all_matches = fetch_all_season_matches() if last_match_id is None else [last_match_id + 1]
+
+    for match_id in all_matches:
+        match_data = fetch_match_details(match_id)
+        if match_data:
+            # Upload JSON directly to GCP
+            upload_to_gcs(GCS_BUCKET_NAME, match_data, f"match_{match_id}.json")
+
+if __name__ == "__main__":
+    main()
