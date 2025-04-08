@@ -14,7 +14,7 @@ provider "google" {
 }
 
 
-resource "google_storage_bucket" "terraform-demo-bucket-kg" {
+resource "google_storage_bucket" "terraform-fotmob-terra-bucket-kg" {
   name          = var.gcs_bucket_name
   location      = var.location
   force_destroy = true
@@ -29,6 +29,11 @@ resource "google_storage_bucket" "terraform-demo-bucket-kg" {
   }
 }
 
+resource "google_dataproc_cluster" "etl_cluster" {
+  name   = var.dataproc_name#"epl-etl-cluster"
+  region = var.region#"us-central1"
+  
+}
 
 # resource "google_bigquery_dataset" "demo_dataset" {
 #   dataset_id = var.bq_dataset_name

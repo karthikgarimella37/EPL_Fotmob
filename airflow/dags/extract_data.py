@@ -72,44 +72,66 @@ def postgres_connection(file_path):
 def check_existing_matches(engine):
     """Check if all matches exist in dim_match. If not, get the latest match inserted"""
     with engine.connect() as conn:
-        result = conn.execute(text("SELECT COUNT(*) FROM dim_match"))
+        result = conn.execute(text("SELECT COUNT(*) FROM dimmatch"))
         count = result.scalar()
         if count == 0:
+            print("No Matches")
             return None  # No matches exist, fetch all
         else:
-            last_match = conn.execute(text("SELECT MAX(match_id) FROM dim_match")).scalar()
+            last_match = conn.execute(text("SELECT MAX(match_id) FROM dimmatch")).scalar()
             return last_match
         
 
-def fetch_all_season_matches(start_year=2010, end_year=2024):
+def fetch_all_season_matches(start_year=2014, end_year=2024):
     """Fetch all EPL matches from the given range of seasons"""
     all_matches = []
     for year in range(start_year, end_year):
+        headers = {
+    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvbWF0Y2hNZWRpYT9tYXRjaElkPTQ1MDYzODAmY2NvZGUzPVVTQV9NSSIsImNvZGUiOjE3NDQwOTU1ODEyMTIsImZvbyI6InByb2R1Y3Rpb246MWY5M2JiMDI1M2U5ZWRkZmEyOWQ5OTg0NjNkYzNkOTYyZGY0NTdiYS11bmRlZmluZWQifSwic2lnbmF0dXJlIjoiRjU5NjU1NDY3MTYzMzYyNkM5NEUzRURDMzI5MkVDN0IifQ=="
+                    }
         url = f"https://www.fotmob.com/api/fixtures?id=47&season={year}%2F{year+1}"
-        response = requests.get(url)
+        response = requests.get(url, headers=headers)
+        print(f"Request to {url} returned status code {response.status_code}")
         if response.status_code == 200:
+            print("Raw response: ", response.text)
             matches = response.json()
+            print("Matches: ", matches)
             for match in matches:
                 all_matches.append(match['id'])
+    print(f"fetch_all_season_matches function done {all_matches}")
     return all_matches
 
 def fetch_match_details(match_id):
     """Fetch details of a given match"""
+    headers = {
+    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvbWF0Y2hNZWRpYT9tYXRjaElkPTQ1MDYzODAmY2NvZGUzPVVTQV9NSSIsImNvZGUiOjE3NDQwOTU1ODEyMTIsImZvbyI6InByb2R1Y3Rpb246MWY5M2JiMDI1M2U5ZWRkZmEyOWQ5OTg0NjNkYzNkOTYyZGY0NTdiYS11bmRlZmluZWQifSwic2lnbmF0dXJlIjoiRjU5NjU1NDY3MTYzMzYyNkM5NEUzRURDMzI5MkVDN0IifQ=="
+                    }
     url = f"https://www.fotmob.com/api/matchDetails?matchId={match_id}"
-    response = requests.get(url)
+    response = requests.get(url, headers=headers)
     if response.status_code == 200:
+        print(f"Successfully fetched match {match_id}")
         return response.json()
-    return None
+    else:
+        print(f"Failed to fetch match {match_id}, status code: {response.status_code}")
+        return None
 
 def upload_to_gcs(bucket_name, data, destination_blob_name):
     """Uploads JSON data to Google Cloud Storage directly"""
     storage_client = storage.Client()
+
+    client = storage.Client()
+    buckets = list(client.list_buckets())
+    print("Buckets visible to the client:")
+    for b in buckets:
+        print("-", b.name)
+
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
 
     # Upload JSON data as a string
     blob.upload_from_string(json.dumps(data), content_type="application/json")
     print(f"Uploaded {destination_blob_name} to {bucket_name}")
+    
 
 
 def main():
@@ -128,11 +150,14 @@ def main():
 
     # Fetch matches
     all_matches = fetch_all_season_matches() if last_match_id is None else [last_match_id + 1]
+    print("Done with fetching all_matches")
 
     for match_id in all_matches:
+        print(f"Fetching {match_id} Details")
         match_data = fetch_match_details(match_id)
         if match_data:
             # Upload JSON directly to GCP
+            print("Uploading to GCS bucket")
             upload_to_gcs(GCS_BUCKET_NAME, match_data, f"match_{match_id}.json")
 
 if __name__ == "__main__":

@@ -18,6 +18,11 @@ variable "location" {
   default     = "US"
 }
 
+variable "dataproc_name" {
+  description = "DataProc Name"
+  default = "pl-etl-cluster"
+  
+}
 # variable "bq_dataset_name" {
 #   description = "My Big Query Dataset"
 #   default     = "demo_dataset"
