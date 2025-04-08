@@ -172,3 +172,14 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Ignoring the json keys
+*.json
+
+# Ignoring Temp HCL files
+*.lock.hcl 
+
+# Ignoring TF States
+*.tfstate
+*.exe
+LICENSE.txt

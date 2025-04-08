@@ -53,16 +53,16 @@ def fotmob_ip_rotator(matchID):
     
     '''
     # Initialize the ApiGateway
-    gateway = ApiGateway('https://www.fotmob.com/api/matchDetails?matchId={matchID}', regions = EXTRA_REGIONS)
+    gateway = ApiGateway(f'https://www.fotmob.com/api/matchDetails?matchId={matchID}', regions = EXTRA_REGIONS)
     gateway.start()
 
     # Start session
     session = requests.Session()
-    session.mount('https://www.fotmob.com/api/matchDetails?matchId={matchID}', gateway)
+    session.mount(f'https://www.fotmob.com/api/matchDetails?matchId={matchID}', gateway)
     return session
 
 
-def postgres_connection():
+def postgres_connection(file_path):
     sql_username, sql_password, sql_host, sql_port, sql_database = postgres_credentials(file_path)
     connection_string = f'postgresql+psycopg2://{sql_username}:{sql_password}@{sql_host}:{sql_port}/{sql_database}'
     engine = create_engine(connection_string)
