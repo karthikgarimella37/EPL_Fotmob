@@ -20,8 +20,8 @@ variable "location" {
 
 variable "dataproc_name" {
   description = "DataProc Name"
-  default = "pl-etl-cluster"
-  
+  default     = "etl-cluster"
+
 }
 # variable "bq_dataset_name" {
 #   description = "My Big Query Dataset"
@@ -36,4 +36,9 @@ variable "gcs_bucket_name" {
 variable "gcs_storage_class" {
   description = "Bucket Storage Class"
   default     = "STANDARD"
+}
+
+variable "dataproc_service_account" {
+  description = "DataProc IAM User Name"
+  default = "fotmob-epl-etl@rare-habitat-447201-d6.iam.gserviceaccount.com"
 }
