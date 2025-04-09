@@ -83,6 +83,7 @@ def main():
 
         raw_df = spark.read.option("multiline", "true").json(f"{args.gcs_path}*.json")
         print(raw_df.head(100))
+        raw_df.toPandas().to_csv('mycsv.csv')
 
     
     except Exception as e:

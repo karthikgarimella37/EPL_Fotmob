@@ -132,6 +132,8 @@ services:
     restart: always
 
   airflow-webserver:
+    env_file:
+      - .env
     <<: *airflow-common
     command: webserver
     ports:
