@@ -19,7 +19,12 @@ RUN curl -L -o /opt/spark/jars/postgresql-42.6.0.jar https://jdbc.postgresql.org
 RUN curl -o /opt/spark/jars/gcs-connector-hadoop3-latest.jar \
     https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-latest.jar
 
-
+RUN curl -sSL https://sdk.cloud.google.com | bash
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg && apt-get update -y && apt-get install google-cloud-cli -y
+    
+RUN gsutil --version
 # Install Requirements.txt
 RUN pip3 install -r requirements.txt
 RUN pip3 install apache-airflow --upgrade
+
+COPY /airflow/dags/terraform_keys.json /opt/airflow/terraform_keys.json

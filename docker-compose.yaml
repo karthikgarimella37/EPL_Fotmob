@@ -62,6 +62,7 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/terraform_keys.json
     AWS_ACCESS_KEY_ID: ${aws_access_key_id}
 
     AWS_SECRET_ACCESS_KEY: ${aws_secret_access_key}
@@ -77,6 +78,7 @@ x-airflow-common:
     sql_port: ${sql_port}
 
     sql_database: ${sql_database}
+    
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
@@ -93,6 +95,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - ./airflow/dags/terraform_keys.json:/opt/airflow/dags/terraform_keys.json
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -134,6 +137,8 @@ services:
   airflow-webserver:
     env_file:
       - .env
+    # volumes:
+    #   - ./terraform_keys.json:/opt/airflow/terraform_keys.json
     <<: *airflow-common
     command: webserver
     ports:
@@ -182,6 +187,8 @@ services:
       # Required to handle warm shutdown of the celery workers properly
       # See https://airflow.apache.org/docs/docker-stack/entrypoint.html#signal-propagation
       DUMB_INIT_SETSID: "0"
+    # volumes:
+    #   - ./terraform_keys.json:/opt/airflow/terraform_keys.json
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
