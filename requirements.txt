@@ -9,3 +9,4 @@ requests-ip-rotator==1.0.14
 SQLAlchemy==2.0.40
 urllib3==1.26.20
 pyspark
+python-dotenv
