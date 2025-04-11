@@ -28,3 +28,10 @@ RUN pip3 install -r requirements.txt
 RUN pip3 install apache-airflow --upgrade
 
 COPY /airflow/dags/terraform_keys.json /opt/airflow/terraform_keys.json
+
+RUN pip3 uninstall -y python-dotenv && \
+    pip3 install -U python-dotenv
+
+RUN mkdir opt/deps && \
+pip install -t opt/deps -r /requirements.txt && \
+cd deps && zip -r ../deps.zip .
