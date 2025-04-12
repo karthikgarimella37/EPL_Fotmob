@@ -32,6 +32,11 @@ COPY /airflow/dags/terraform_keys.json /opt/airflow/terraform_keys.json
 RUN pip3 uninstall -y python-dotenv && \
     pip3 install -U python-dotenv
 
-RUN mkdir opt/deps && \
-pip install -t opt/deps -r /requirements.txt && \
-cd deps && zip -r ../deps.zip .
+RUN apt-get update && apt-get install -y zip && rm -rf /var/lib/apt/lists/*
+
+RUN rm -rf /tmp/deps && \
+mkdir -p /tmp/deps && \
+chmod -R 777 /tmp/deps
+USER airflow
+RUN pip install -t /tmp/deps -r /requirements.txt
+RUN cd /tmp/deps && zip -r /tmp/deps.zip .
