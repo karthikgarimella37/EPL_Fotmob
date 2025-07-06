@@ -1,4 +1,4 @@
-from pyspark.sql.functions import col, concat, lit, lower, regexp_replace, when, explode, row_number, to_timestamp
+from pyspark.sql.functions import col, concat, lit, lower, regexp_replace, when, explode, row_number, to_timestamp, first
 from pyspark.sql import Window
 from pyspark.sql.types import StructType
 import logging
@@ -362,4 +362,93 @@ def fact_player_shotmap_stg(postgres_args, raw_df):
     logger.info(f"Inserting {final_df.count()} shotmap events into player_shotmap_fact_stg table.")
     write_to_postgres(final_df, 'player_shotmap_fact_stg', postgres_args)
     logger.info(f"Inserted {final_df.count()} shotmap events into player_shotmap_fact_stg table.")
+    
+def fact_player_stats_stg(postgres_args, raw_df):
+    '''
+    Loading player_stats_fact_stg Table
+    '''
+    if "playerStats" not in raw_df.select("content.*").schema.names:
+        logger.info("playerStats data not found in this file's schema. Skipping.")
+        return
+
+    # playerStats is a map, so we explode it to get rows for each player
+    player_stats_df = raw_df.filter(col("content.playerStats").isNotNull()).select(
+        col("general.matchId").alias("MatchID"),
+        explode(col("content.playerStats")).alias("player_id_str", "player_data")
+    )
+
+    if player_stats_df.rdd.isEmpty():
+        logger.info("playerStats data is null or empty. Skipping.")
+        return
+
+    # Extract base player info and explode stat groups
+    base_df = player_stats_df.select(
+        "MatchID",
+        col("player_data.id").alias("PlayerID"),
+        col("player_data.teamId").alias("TeamID"),
+        col("player_data.isGoalkeeper").alias("IsGoalkeeper"),
+        col("player_data.funFacts").getItem(0).getField('fallback').alias("FunFact"),
+        col("player_data.shotmap").getItem(0).getField('id').alias("ShotMapID"),
+        explode(col("player_data.stats")).alias("stat_group")
+    )
+
+    # From each stat group, get the map of stats
+    stats_df = base_df.select(
+        "MatchID", "PlayerID", "TeamID", "IsGoalkeeper", "FunFact", "ShotMapID",
+        explode(col("stat_group.stats")).alias("stat_name", "stat_value_obj")
+    )
+
+    # Define stat mapping from JSON to DDL
+    stat_mapping = {
+        'FotMob rating': 'FotmobRating', 'Minutes played': 'MinutesPlayed', 'Goals': 'GoalsScored',
+        'Assists': 'Assists', 'Total shots': 'TotalShots', 'Accurate passes': 'AccuratePasses',
+        'Chances created': 'ChancesCreated', 'Expected goals (xG)': 'ExpectedGoals',
+        'Expected goals on target (xGOT)': 'ExpectedGoalsOnTarget', 'Expected assists (xA)': 'ExpectedAssists',
+        'xG + xA': 'xGandxA', 'Fantasy points': 'FantasyPoints', 'Fantasy bonus points': 'FantasyBonusPoints',
+        'Shots on target': 'ShotsOnTarget', 'Big chances missed': 'BigChancesMissed',
+        'Blocked shots': 'BlockedShots', 'Hit woodwork': 'HitWoodwork', 'Touches': 'Touches',
+        'Touches in opposition box': 'TouchesinOppBox', 'Successful dribbles': 'SuccessfulDribbles',
+        'Passes into final third': 'PassesintoFinalThird', 'Dispossessed': 'Dispossessed',
+        'xG Non-penalty': 'xGNonPenalty', 'Tackles won': 'TacklesWon', 'Clearances': 'Clearances',
+        'Headed clearance': 'HeadedClearances', 'Interceptions': 'Interceptions',
+        'Defensive actions': 'DefensiveActions', 'Recoveries': 'Recoveries',
+        'Dribbled past': 'DribbledPast', 'Duels won': 'DuelsWon', 'Duels lost': 'DuelsLost',
+        'Ground duels won': 'GroundDuelsWon', 'Aerial duels won': 'AerialDuelsWon',
+        'Was fouled': 'WasFouled', 'Fouls committed': 'FoulsCommitted'
+    }
+    
+    # Aggregate stats for each player by taking the first non-null value for each stat type
+    agg_exprs = []
+    for json_name, db_name in stat_mapping.items():
+        agg_exprs.append(
+            first(
+                when(col("stat_name") == json_name, col("stat_value_obj.stat.value")),
+                ignorenulls=True
+            ).alias(db_name)
+        )
+
+    grouped_df = stats_df.groupBy("MatchID", "PlayerID", "TeamID", "IsGoalkeeper", "FunFact", "ShotMapID").agg(*agg_exprs)
+    
+    # Ensure all columns from the DDL exist, adding nulls if they don't
+    ddl_cols = [
+        "PlayerID", "TeamID", "MatchID", "IsGoalkeeper", "FotmobRating", "MinutesPlayed", "GoalsScored",
+        "Assists", "TotalShots", "AccuratePasses", "ChancesCreated", "ExpectedGoals", "ExpectedGoalsOnTarget",
+        "ExpectedAssists", "xGandxA", "FantasyPoints", "FantasyBonusPoints", "ShotsOnTarget", "BigChancesMissed",
+        "BlockedShots", "HitWoodwork", "Touches", "TouchesinOppBox", "SuccessfulDribbles",
+        "PassesintoFinalThird", "Dispossessed", "xGNonPenalty", "TacklesWon", "Clearances", "HeadedClearances",
+        "Interceptions", "DefensiveActions", "Recoveries", "DribbledPast", "DuelsWon", "DuelsLost",
+        "GroundDuelsWon", "AerialDuelsWon", "WasFouled", "FoulsCommitted", "ShotMapID", "FunFact"
+    ]
+
+    final_df = grouped_df
+    for col_name in ddl_cols:
+        if col_name not in final_df.columns:
+            final_df = final_df.withColumn(col_name, lit(None))
+            
+    final_df = final_df.select(ddl_cols).dropDuplicates(["MatchID", "TeamID", "PlayerID"])
+
+    logger.info(f"Inserting {final_df.count()} player stats into player_stats_fact_stg table.")
+    write_to_postgres(final_df, 'player_stats_fact_stg', postgres_args)
+    logger.info(f"Inserted {final_df.count()} player stats into player_stats_fact_stg table.")
+
     
