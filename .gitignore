@@ -231,3 +231,8 @@ terraform.rc
 
 # Ignore all .vscode folders recursively
 **/.vscode/
+.airflow/
+
+terraform/C*Userskarth.sshepl_fotmob
+terraform/C*Userskarth.sshepl_fotmob.pub
+airflow/dags/postgresql-42.6.0.jar

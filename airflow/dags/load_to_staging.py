@@ -22,6 +22,10 @@ from pyspark.sql.types import (
     LongType,
     TimestampType,
 )
+from pyspark.sql.functions import col, explode, lit, when
+from data_loading_functions import (
+    dim_team_stg, dim_player_stg, dim_match_stg, dim_league_stg,
+    fact_match_lineup_stg)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -73,7 +77,11 @@ def postgres_credentials(file_path):
 def create_spark_session():
     return (SparkSession.builder
             .appName("SparkGCPtoPostgres")
-            .config("spark.jars", "/usr/lib/spark/jars/postgresql-42.6.0.jar")
+            .config("spark.jars", "/opt/spark/jars/postgresql-42.6.0.jar,/opt/spark/jars/gcs-connector-hadoop3-latest.jar")
+            .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
+            .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", "/opt/airflow/secrets/gcp_credentials.json")
+            .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+            .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
             .getOrCreate())
 
 def custom_schema():
@@ -830,13 +838,29 @@ def custom_schema():
 
     return custom_schema
 
+def load_to_staging(spark_session, gcs_path, schema, postgres_args):
+    '''
+    Loads the data from the GCS bucket to the staging area
+    '''
+    raw_df = spark_session.read.option("multiline", "true").schema(schema).json(f"{gcs_path}*.json")
+
+    # print(raw_df.limit(5).toPandas().head())
+    # print(raw_df.limit(5).toPandas().columns)
+
+    # Load Dim Stg Tables
+    # dim_team_stg(postgres_args, raw_df)
+    # dim_player_stg(postgres_args, raw_df)
+    # dim_match_stg(postgres_args, raw_df)
+    # dim_league_stg(postgres_args, raw_df)
+    fact_match_lineup_stg(postgres_args, raw_df)
 
 
 def main():
     # args = parse_arguments()
 
     spark = create_spark_session()
-    env_file_path = os.path.join(os.path.dirname(__file__), '../../.env')
+    env_file_path = os.path.join(os.path.dirname(__file__), '../.env')
+    # env_file_path = ".env"
     sql_username, sql_password, sql_host, sql_port, sql_database = postgres_credentials(env_file_path)
     
     load_dotenv(dotenv_path=env_file_path)
@@ -851,11 +875,21 @@ def main():
             "url": f"jdbc:postgresql://{sql_host}:{sql_port}/{sql_database}",
 
         }
+        jdbc_url = postgres_args["url"]
 
         logger.info(f"Looking for team data in {gcs_path}...")
+        print("sql_username:", sql_username)
+        print("sql_password:", sql_password)
+        print("sql_host:", sql_host)
+        print("sql_port:", sql_port)
+        print("sql_database:", sql_database)
         schema = custom_schema()
-        raw_df = spark.read.option("multiline", "true").schema(schema).json(f"{gcs_path}*.json")
-        print(raw_df.head(100))
+        # raw_df = spark.read.option("multiline", "true").schema(schema).json(f"{gcs_path}*.json")
+        # print(raw_df.head(100))
+        load_to_staging(spark, gcs_path, schema, postgres_args)
+
+
+
 
         
 

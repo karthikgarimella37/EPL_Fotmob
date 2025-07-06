@@ -1,66 +1,3 @@
-# sql connections
-# create db if not exists
-#create tables if not exists
-# try to incorporate terraform
-# #create sequences for dim and fact tables
-
-import os
-# import json
-# import requests
-import psycopg2 as psy
-from dotenv import load_dotenv
-# from google.cloud import storage
-from sqlalchemy import create_engine, text
-
-# SQL DB Keys
-def postgres_credentials(file_path):
-    '''
-    Loads the environment variables from the .env file
-    '''
-    load_env(file_path)
-    sql_username = os.getenv("sql_username")
-    sql_password = os.getenv("sql_password")
-    sql_host = os.getenv("sql_host")
-    sql_port = os.getenv("sql_port")
-    sql_database = os.getenv("sql_database")
-
-    return sql_username, sql_password, sql_host, sql_port, sql_database
-
-
-def postgres_connection(file_path):
-    '''
-    Creates a connection to the postgres database
-    '''
-    sql_username, sql_password, sql_host, sql_port, sql_database = postgres_credentials(file_path)
-    connection_string = f'postgresql+psycopg2://{sql_username}:{sql_password}@{sql_host}:{sql_port}/{sql_database}'
-    engine = create_engine(connection_string)
-
-    return engine
-
-def check_existing_matches(engine):
-    """
-    Check if all matches exist in dim_match. If not, get the latest match inserted
-    """
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT COUNT(*) FROM dim_match"))
-        count = result.scalar()
-        if count == 0:
-            return None  # No matches exist, fetch all
-        else:
-            last_match = conn.execute(text("SELECT MAX(match_id) FROM dim_match")).scalar()
-            return last_match
-
-def load_env(file_path):
-    load_dotenv(dotenv_path=file_path)
-
-def create_all_tables_sequences(engine):
-    '''
-    Creates all tables and sequences
-    '''
-    with engine.connect() as connection:
-        with connection.begin():
-            connection.execute(text("""\
-                          
 
 -- Sequences for Dim tables
 CREATE SEQUENCE IF NOT EXISTS seq_dim_team_id START 1 INCREMENT BY 1 NO maxvalue NO cycle;
@@ -163,7 +100,7 @@ CREATE TABLE IF NOT EXISTS player_shotmap_fact_stg (
     xPosition FLOAT,
     yPosition FLOAT,
     Minute INT,
-    IsBlocked BOOLEAN,
+    IsBlocked BOOLEAN,,
     IsOnTarget BOOLEAN,
     BlockedXPosition FLOAT,
     BlockedYPosition FLOAT,
@@ -331,7 +268,7 @@ CREATE TABLE IF NOT EXISTS match_lineup_fact (
     PlayerOfTheMatch VARCHAR(255),
     IsCaptain BOOLEAN,
     InsertDate TIMESTAMP,
-    UpdateDate TIMESTAMP,
+    UpdateDate TIMESTAMP
     PRIMARY KEY (MatchID, TeamID, PlayerID)    
 );
 
@@ -344,7 +281,7 @@ CREATE TABLE IF NOT EXISTS player_shotmap_fact (
     xPosition FLOAT,
     yPosition FLOAT,
     Minute INT,
-    IsBlocked BOOLEAN,
+    IsBlocked BOOLEAN,,
     IsOnTarget BOOLEAN,
     BlockedXPosition FLOAT,
     BlockedYPosition FLOAT,
@@ -365,7 +302,7 @@ CREATE TABLE IF NOT EXISTS player_shotmap_fact (
     AssistString VARCHAR(255),
     AssistPlayerID BIGINT,
     InsertDate TIMESTAMP,
-    UpdateDate TIMESTAMP,
+    UpdateDate TIMESTAMP
     PRIMARY KEY (MatchID, ShotMapID, PlayerID)
 );
 
@@ -414,17 +351,6 @@ CREATE TABLE IF NOT EXISTS player_stats_fact (
     ShotMapID BIGINT,
     FunFact VARCHAR(255),
     InsertDate TIMESTAMP,
-    UpdateDate TIMESTAMP,
+    UpdateDate TIMESTAMP
     PRIMARY KEY (PlayerID, TeamID, MatchID)
 );
-    
-                        """))
-
-if __name__ == "__main__":
-    file_path = os.path.join(os.path.dirname(__file__), '../.env')
-    engine = postgres_connection(file_path)
-    create_all_tables_sequences(engine)
-    with engine.connect() as conn:
-        query_result = conn.execute(text("""select count(*) from player_stats_fact;"""))
-        print(query_result.scalar())
-    print("Tables and Sequences Created!")

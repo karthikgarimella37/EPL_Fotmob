@@ -30,14 +30,14 @@ resource "google_storage_bucket" "terraform-fotmob-terra-bucket-kg" {
 }
 
 resource "google_dataproc_cluster" "etl-cluster" {
-  
-  name   = var.dataproc_name
+
+  name    = var.dataproc_name
   project = var.project
-  region = var.region
-  
+  region  = var.region
+
   cluster_config {
     staging_bucket = var.gcs_bucket_name
-    temp_bucket = var.gcs_bucket_name
+    temp_bucket    = var.gcs_bucket_name
     master_config {
       num_instances = 1
       machine_type  = "n1-standard-2"
@@ -55,7 +55,7 @@ resource "google_dataproc_cluster" "etl-cluster" {
 resource "google_storage_bucket_iam_member" "dataproc_bucket_access" {
   bucket = google_storage_bucket.terraform-fotmob-terra-bucket-kg.name
   role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:356709329040-compute@developer.gserviceaccount.com"
+  member = "serviceAccount:${var.dataproc_service_account}"
 }
 
 

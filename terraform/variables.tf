@@ -1,11 +1,11 @@
 variable "credentials" {
   description = "Project Credentials"
-  default     = "./terraform_keys/terraform_keys.json"
+  default     = "./terraform_keys/alert-rush-458419-c2-be92140d2382.json"
 }
 
 variable "project" {
   description = "Project: Fotmob ETL"
-  default     = "rare-habitat-447201-d6"
+  default     = "alert-rush-458419-c2"
 }
 
 variable "region" {
@@ -40,5 +40,5 @@ variable "gcs_storage_class" {
 
 variable "dataproc_service_account" {
   description = "DataProc IAM User Name"
-  default = "fotmob-epl-etl@rare-habitat-447201-d6.iam.gserviceaccount.com"
+  default = "epl-fotmob@alert-rush-458419-c2.iam.gserviceaccount.com"
 }

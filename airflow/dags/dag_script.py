@@ -1,114 +1,102 @@
 import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-import logging
-import subprocess
-from pyspark.sql import SparkSession
-from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.operators.python_operator import PythonOperator
-from airflow.operators.bash import BashOperator
-from airflow.providers.google.cloud.operators.dataproc import DataprocSubmitJobOperator
-from airflow.hooks.base_hook import BaseHook
 from dotenv import load_dotenv
 from google.cloud import storage
+from airflow import DAG
+from airflow.providers.standard.operators.python import PythonOperator
+from airflow.providers.google.cloud.operators.dataproc import DataprocSubmitJobOperator
+from datetime import datetime, timedelta
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from create_sql import postgres_connection, create_all_tables_sequences
+from extract_data import main as extract_data_main
+from load_to_staging import main as load_to_staging_main
+from truncate_stg import truncate_stg
 
-# Define the function that will be used in the Airflow task
-def load_env(file_path):
-    load_dotenv(dotenv_path=file_path)
-    print(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"), 
-    os.getenv("sql_username"), 
-    os.getenv("sql_host"))
-
-def create_spark_session():
-    
-    return (SparkSession.builder
-            .appName("Spark-Postgres-Data-Pipeline") \
-            .config("spark.jars", "/opt/spark/jars/gcs-connector-hadoop3-latest.jar,/opt/spark/jars/postgresql-42.6.0.jar") \
-            .config("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
-            .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", os.getenv("GOOGLE_APPLICATION_CREDENTIALS")) \
-            .getOrCreate())
 
 default_args = {
     'owner': 'airflow',
-    'retries': 1,
-    # 'retry_delay': timedelta(minutes=5),
-    'start_date': datetime(2025, 4, 9),  # Adjust as necessary
+    'retries': 0,
 }
 
-def upload_to_gcs(**kwargs):
-    # Retrieve variables from Airflow
-    gcs_path = kwargs['dag_run'].conf.get('gcs_path', 'gs://terraform-fotmob-terra-bucket-kg/')
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/opt/airflow/terraform_keys.json"
+dag = DAG(
+    dag_id = 'epl_data_pipeline',
+    default_args = default_args,
+    description = 'EPL Data Pipeline',
+    schedule = None,
+    start_date = datetime(2025, 1, 1)
+)
 
-    
-    # Load environment variables
-    env_file_path = kwargs['dag_run'].conf.get('env_file', '/../../.env')
-    load_env(env_file_path)
+def create_tables():
+    file_path = os.path.join(os.path.dirname(__file__), '../.env')
+    engine = postgres_connection(file_path)
+    create_all_tables_sequences(engine)
+
+def upload_to_gcs():
+    env_path = os.path.join(os.path.dirname(__file__), '../.env')
+    load_dotenv(env_path)
     storage_client = storage.Client()
-    
-    # Create Spark session
-    spark = create_spark_session()
+    bucket = storage_client.bucket('terraform-fotmob-terra-bucket-kg')
+    blob = bucket.blob('load_to_staging.py')
+    blob.upload_from_filename(f"/opt/airflow/dags/load_to_staging.py")
+    blob = bucket.blob('deps.zip')
+    blob.upload_from_filename(f"/tmp/deps.zip")
+    blob = bucket.blob('.env')
+    blob.upload_from_filename(env_path)
+    blob = bucket.blob('postgresql-42.6.0.jar')
+    blob.upload_from_filename(f"/opt/airflow/dags/postgresql-42.6.0.jar")
+    print("PySpark Script, deps.zip, .env, and PostgreSQL JDBC driver JAR uploaded to GCS")
 
-    try:
-        # Set up credentials (GCP, PostgreSQL, etc.)
-        gcp_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        bucket = storage_client.bucket("terraform-fotmob-terra-bucket-kg")
-        blob = bucket.blob("load_to_staging.py")
-        blob.upload_from_filename(f"/opt/airflow/dags/load_to_staging.py")
-        gcs_path = "gs://terraform-fotmob-terra-bucket-kg/"
-        blob = bucket.blob("deps.zip")
-        blob.upload_from_filename(f"/tmp/deps.zip")
+    # print("PySpark Script uploaded to GCS")
 
-        print("File uploaded successfully")
 
-        # Read the raw JSON data from GCS
-       
-        # raw_df.toPandas().to_csv('mycsv.csv')
+create_sql_task = PythonOperator(
+    task_id = 'create_sql',
+    python_callable = create_tables,
+    dag = dag
+)
 
-    except Exception as e:
-        logger.error(f"Error running Spark job: {str(e)}")
-        raise
-    finally:
-        spark.stop()
+extract_data_task = PythonOperator(
+    task_id = 'extract_data',
+    python_callable = extract_data_main,
+    dag = dag
+)
 
-with DAG(
-    dag_id="spark_postgres_gcs_pipeline",
-    default_args=default_args,
-    schedule_interval="@once",  # Set your schedule or leave it for manual triggering
-    catchup=False,
-) as dag:
-    
-    # Copy pyspark to GCS for submitting Pyspark job
-    submit_job = PythonOperator(
-        task_id="copy_pyspark_job_to_gcs",
-        python_callable = upload_to_gcs
-    )
+truncate_stg_task = PythonOperator(
+    task_id = 'truncate_stg',
+    python_callable = truncate_stg,
+    dag = dag
+)
 
-    pyspark_job = {
-        "reference": {"project_id": "rare-habitat-447201-d6"},
+# Task to upload files to GCS
+upload_gcs_task = PythonOperator(
+    task_id='upload_dependencies_to_gcs',
+    python_callable=upload_to_gcs,
+    dag=dag,
+)
+
+pyspark_job = {
+        "reference": {"project_id": "alert-rush-458419-c2"},
         "placement": {"cluster_name": "etl-cluster"},
         "pyspark_job": {
             "main_python_file_uri": "gs://terraform-fotmob-terra-bucket-kg/load_to_staging.py",
-            "python_file_uris": ["gs://terraform-fotmob-terra-bucket-kg/deps.zip"]
+            "python_file_uris": ["gs://terraform-fotmob-terra-bucket-kg/deps.zip"],
+            "file_uris": ["gs://terraform-fotmob-terra-bucket-kg/.env"],
+            "jar_file_uris": ["gs://terraform-fotmob-terra-bucket-kg/postgresql-42.6.0.jar"],
+            "properties": {
+                "spark.dataproc.pip.packages": "numpy==1.26.4 pyspark==3.5.1 pandas==2.2.3"
+            }
         }
     }
-    # Create the Airflow task using PythonOperator
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/opt/airflow/terraform_keys.json"
-    create_dataproc = DataprocSubmitJobOperator(
-        task_id="run_spark_job",
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/opt/airflow/secrets/gcp_credentials.json"
+load_to_staging_task = DataprocSubmitJobOperator(
+        task_id="load_to_staging",
         job=pyspark_job,
         region="us-central1",
-        project_id="rare-habitat-447201-d6",
-        gcp_conn_id="google_cloud_default",
+        project_id="alert-rush-458419-c2",
+        gcp_conn_id="gcp_credentials",
+        dag=dag
 
     )
-    
 
-
-
-    # Set the task sequence (if more tasks are defined)
-    submit_job >> create_dataproc
+# create_sql_task >> extract_data_task >> upload_gcs_task
+truncate_stg_task >> load_to_staging_task
+# upload_gcs_task >> load_to_staging_task

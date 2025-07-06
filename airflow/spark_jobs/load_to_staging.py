@@ -4,7 +4,6 @@ import argparse
 import logging
 import os
 import requests
-import psycopg2 as psy
 from dotenv import load_dotenv
 from google.cloud import storage
 from sqlalchemy import create_engine, text
@@ -44,18 +43,18 @@ def postgres_credentials(file_path):
 
     return sql_username, sql_password, sql_host, sql_port, sql_database
 
-# def parse_arguments():
-#     parser = argparse.ArgumentParser(description="Load Teams Json data from GCS to Postgres")
-#     parser.add_argument('--gcs-path', required=True, help='GCS path with JSON files (gs://bucket/path/)')
-#     parser.add_argument('--supabase-host', required=True, help='Supabase Postgres host')
-#     parser.add_argument('--supabase-port', default='5432', help='Supabase Postgres port')
-#     parser.add_argument('--supabase-db', required=True, help='Supabase database name')
-#     parser.add_argument('--supabase-user', required=True, help='Supabase database user')
-#     parser.add_argument('--supabase-password', required=True, help='Supabase database password')
-#     parser.add_argument('--dim-table', default='dim_stg', help='Dimension staging table name')
-#     parser.add_argument('--processing-date', default=datetime.now().strftime('%Y-%m-%d'), 
-#                         help='Processing date in YYYY-MM-DD format')
-#     return parser.parse_args()
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Load Teams Json data from GCS to Postgres")
+    parser.add_argument('--gcs-path', required=True, help='GCS path with JSON files (gs://bucket/path/)')
+    parser.add_argument('--supabase-host', required=True, help='Supabase Postgres host')
+    parser.add_argument('--supabase-port', default='5432', help='Supabase Postgres port')
+    parser.add_argument('--supabase-db', required=True, help='Supabase database name')
+    parser.add_argument('--supabase-user', required=True, help='Supabase database user')
+    parser.add_argument('--supabase-password', required=True, help='Supabase database password')
+    parser.add_argument('--dim-table', default='dim_stg', help='Dimension staging table name')
+    parser.add_argument('--processing-date', default=datetime.now().strftime('%Y-%m-%d'), 
+                        help='Processing date in YYYY-MM-DD format')
+    return parser.parse_args()
 
 def create_spark_session():
     return (SparkSession.builder

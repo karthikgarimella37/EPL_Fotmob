@@ -1,11 +1,15 @@
 import os
 import logging
 import subprocess
-from datetime import datetime
+from pyspark.sql import SparkSession
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
+from airflow.operators.bash import BashOperator
 from airflow.hooks.base_hook import BaseHook
 from dotenv import load_dotenv
+from google.cloud import storage
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -15,10 +19,12 @@ def load_env(file_path):
     load_dotenv(dotenv_path=file_path)
 
 def create_spark_session():
-    from pyspark.sql import SparkSession
+    # from pyspark.sql import SparkSession
     return (SparkSession.builder
-            .appName("Spark-Postgres-Data-Pipeline")
-            .config("spark.jars", "/usr/lib/spark/jars/postgresql-42.6.0.jar")
+            .appName("Spark-Postgres-Data-Pipeline") \
+            .config("spark.jars", "/opt/spark/jars/gcs-connector-hadoop3-latest.jar,/opt/spark/jars/postgresql-42.6.0.jar") \
+            .config("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
+            .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", os.getenv("GOOGLE_APPLICATION_CREDENTIALS")) \
             .getOrCreate())
 
 default_args = {
@@ -33,8 +39,11 @@ def run_spark_job(**kwargs):
     gcs_path = kwargs['dag_run'].conf.get('gcs_path', 'gs://terraform-fotmob-terra-bucket-kg/')
     
     # Load environment variables
-    env_file_path = kwargs['dag_run'].conf.get('env_file', '/path/to/.env')
+    env_file_path = kwargs['dag_run'].conf.get('env_file', '/../../.env')
     load_env(env_file_path)
+    # Assuming GOOGLE_APPLICATION_CREDENTIALS is set
+    storage_client = storage.Client()
+
     
     # Create Spark session
     spark = create_spark_session()
@@ -42,7 +51,7 @@ def run_spark_job(**kwargs):
     try:
         # Set up credentials (GCP, PostgreSQL, etc.)
         gcp_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        
+        gcs_path = os.getenv('GCS_PATH', 'gs://terraform-fotmob-terra-bucket-kg/')
         logger.info(f"Looking for team data in {gcs_path}...")
 
         # Read the raw JSON data from GCS
@@ -67,13 +76,23 @@ with DAG(
     schedule_interval="@once",  # Set your schedule or leave it for manual triggering
     catchup=False,
 ) as dag:
-
+    
+    # Copy pyspark to GCS for submitting Pyspark job
+    submit_job = BashOperator(
+        task_id="copy_pyspark_job_to_gcs",
+        bash_command="\
+            gsutil cp /opt/airflow/dags/load_to_staging.py gs://terraform-fotmob-terra-bucket-kg/"
+    )
     # Create the Airflow task using PythonOperator
-    run_spark_task = PythonOperator(
+    run_spark_task = BashOperator(
         task_id="run_spark_job",
-        python_callable=run_spark_job,
-        provide_context=True,  # Allows access to context variables like 'dag_run'
+        bash_command="""
+            gcloud dataproc jobs submit pyspark gs://terraform-fotmob-terra-bucket-kg/load_to_staging.py \
+            --cluster="etl-cluster" \
+            --region="us-central1" \
+            --project="rare-habitat-447201-d6"
+            """
     )
 
     # Set the task sequence (if more tasks are defined)
-    run_spark_task
+    submit_job >> run_spark_task

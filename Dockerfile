@@ -27,7 +27,7 @@ RUN gsutil --version
 RUN pip3 install -r requirements.txt
 RUN pip3 install apache-airflow --upgrade
 
-COPY /airflow/dags/terraform_keys.json /opt/airflow/terraform_keys.json
+COPY /airflow/dags/alert-rush-458419-c2-be92140d2382.json /opt/airflow/alert-rush-458419-c2-be92140d2382.json
 
 RUN pip3 uninstall -y python-dotenv && \
     pip3 install -U python-dotenv
@@ -40,3 +40,4 @@ chmod -R 777 /tmp/deps
 USER airflow
 RUN pip install -t /tmp/deps -r /requirements.txt
 RUN cd /tmp/deps && zip -r /tmp/deps.zip .
+COPY .env /opt/airflow/.env
