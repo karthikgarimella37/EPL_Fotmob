@@ -85,10 +85,83 @@ def create_spark_session():
             .getOrCreate())
 
 def custom_schema():
+    shot_struct = StructType([
+        StructField("id", LongType(), True),
+        StructField("eventType", StringType(), True),
+        StructField("teamId", IntegerType(), True),
+        StructField("playerId", LongType(), True),
+        StructField("playerName", StringType(), True),
+        StructField("x", DoubleType(), True),
+        StructField("y", DoubleType(), True),
+        StructField("min", IntegerType(), True),
+        StructField("minAdded", IntegerType(), True),
+        StructField("isBlocked", BooleanType(), True),
+        StructField("isOnTarget", BooleanType(), True),
+        StructField("blockedX", DoubleType(), True),
+        StructField("blockedY", DoubleType(), True),
+        StructField("goalCrossedY", DoubleType(), True),
+        StructField("goalCrossedZ", DoubleType(), True),
+        StructField("expectedGoals", DoubleType(), True),
+        StructField("expectedGoalsOnTarget", DoubleType(), True),
+        StructField("shotType", StringType(), True),
+        StructField("situation", StringType(), True),
+        StructField("period", StringType(), True),
+        StructField("isOwnGoal", BooleanType(), True),
+        StructField("onGoalShot", StructType([
+            StructField("x", DoubleType(), True),
+            StructField("y", DoubleType(), True),
+            StructField("zoomRatio", DoubleType(), True)
+        ]), True),
+        StructField("isSavedOffLine", BooleanType(), True),
+        StructField("isFromInsideBox", BooleanType(), True),
+        StructField("keeperId", LongType(), True),
+        StructField("teamColor", StringType(), True)
+    ])
+    
+    # Schemas for playerStats
+    player_stat_value_struct = StructType([
+        StructField("value", DoubleType(), True),
+        StructField("total", DoubleType(), True),
+        StructField("type", StringType(), True)
+    ])
+
+    player_stat_item_struct = StructType([
+        StructField("key", StringType(), True),
+        StructField("stat", player_stat_value_struct, True)
+    ])
+
+    player_stat_group_struct = StructType([
+        StructField("title", StringType(), True),
+        StructField("key", StringType(), True),
+        StructField("stats", MapType(StringType(), player_stat_item_struct), True)
+    ])
+    
+    fun_fact_input_value_struct = StructType([
+        StructField("type", StringType(), True),
+        StructField("value", StringType(), True) 
+    ])
+
+    fun_fact_struct = StructType([
+        StructField("key", StringType(), True),
+        StructField("fallback", StringType(), True),
+        StructField("inputValues", ArrayType(fun_fact_input_value_struct), True)
+    ])
+
+    player_stats_main_struct = StructType([
+        StructField("name", StringType(), True),
+        StructField("id", LongType(), True),
+        StructField("optaId", StringType(), True),
+        StructField("teamId", IntegerType(), True),
+        StructField("teamName", StringType(), True),
+        StructField("isGoalkeeper", BooleanType(), True),
+        StructField("stats", ArrayType(player_stat_group_struct), True),
+        StructField("shotmap", ArrayType(shot_struct), True),
+        StructField("funFacts", ArrayType(fun_fact_struct), True)
+    ])
         
     custom_schema = StructType([
         StructField("general", StructType([
-            StructField("matchId", StringType(), True),
+            StructField("matchId", LongType(), True),
             StructField("matchName", StringType(), True),
             StructField("matchRound", StringType(), True),
             StructField("teamColors", StructType([
@@ -478,50 +551,11 @@ def custom_schema():
                 StructField("showSuperLive", BooleanType(), True)
             ]), True),
             StructField("buzz", StringType(), True), # Null in data
-            StructField("stats", StructType([
-                StructField("Periods", StructType([
-                    StructField("All", StructType([
-                        StructField("stats", ArrayType(
-                            StructType([
-                                StructField("title", StringType(), True),
-                                StructField("key", StringType(), True),
-                                StructField("stats", ArrayType( # Array containing stat details
-                                    StructType([
-                                        StructField("title", StringType(), True),
-                                        StructField("key", StringType(), True),
-                                        StructField("stats", ArrayType(IntegerType()), True), # Stats values
-                                        StructField("type", StringType(), True),
-                                        StructField("highlighted", StringType(), True)
-                                    ])
-                                ), True)
-                            ])
-                        ), True),
-                        StructField("teamColors", StructType([ # Duplicates structure from general.teamColors
-                            StructField("darkMode", StructType([
-                                StructField("home", StringType(), True),
-                                StructField("away", StringType(), True)
-                            ]), True),
-                            StructField("lightMode", StructType([
-                                StructField("home", StringType(), True),
-                                StructField("away", StringType(), True)
-                            ]), True),
-                            StructField("fontDarkMode", StructType([
-                                StructField("home", StringType(), True),
-                                StructField("away", StringType(), True)
-                            ]), True),
-                            StructField("fontLightMode", StructType([
-                                StructField("home", StringType(), True),
-                                StructField("away", StringType(), True)
-                            ]), True)
-                        ]), True)
-                    ]), True)
-                ]), True),
-                StructField("playerStats", StringType(), True), # Null in data
-            ]), True),
+            StructField("playerStats", MapType(StringType(), player_stats_main_struct), True),
             StructField("shotmap", StructType([
-                StructField("shots", ArrayType(StringType()), True), # Assuming string based on empty data
-                StructField("Periods", StructType([ # Assuming structure mirrors stats.Periods
-                    StructField("All", ArrayType(StringType()), True) # Assuming string based on empty data
+                StructField("shots", ArrayType(shot_struct), True),
+                StructField("Periods", StructType([
+                    StructField("All", ArrayType(shot_struct), True)
                 ]), True)
             ]), True),
             StructField("lineup", StructType([
@@ -848,12 +882,12 @@ def load_to_staging(spark_session, gcs_path, schema, postgres_args):
     # print(raw_df.limit(5).toPandas().columns)
 
     # Load Dim Stg Tables
-    dim_team_stg(postgres_args, raw_df)
-    dim_player_stg(postgres_args, raw_df)
-    dim_match_stg(postgres_args, raw_df)
-    dim_league_stg(postgres_args, raw_df)
-    fact_match_lineup_stg(postgres_args, raw_df)
-    fact_player_shotmap_stg(postgres_args, raw_df)
+    # dim_team_stg(postgres_args, raw_df)
+    # dim_player_stg(postgres_args, raw_df)
+    # dim_match_stg(postgres_args, raw_df)
+    # dim_league_stg(postgres_args, raw_df)
+    # fact_match_lineup_stg(postgres_args, raw_df)
+    # fact_player_shotmap_stg(postgres_args, raw_df)
     fact_player_stats_stg(postgres_args, raw_df)
 
 

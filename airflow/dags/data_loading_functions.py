@@ -1,6 +1,6 @@
-from pyspark.sql.functions import col, concat, lit, lower, regexp_replace, when, explode, row_number, to_timestamp, first
+from pyspark.sql.functions import col, concat, lit, lower, regexp_replace, when, explode, row_number, to_timestamp, first, coalesce
 from pyspark.sql import Window
-from pyspark.sql.types import StructType
+from pyspark.sql.types import StructType, LongType
 import logging
 
 
@@ -307,15 +307,17 @@ def fact_player_shotmap_stg(postgres_args, raw_df):
     Loading player_shotmap_fact_stg Table
     '''
     # Check if shotmap data is available in the schema for this file.
-    if not "shotMap" in raw_df.select("content.*").columns or \
-       not "shots" in raw_df.select("content.shotMap.*").columns:
+    if not "shotmap" in raw_df.select("content.*").schema.names or \
+       not "shots" in raw_df.select("content.shotmap.*").schema.names:
         logger.info("Shotmap data not found in this file's schema. Skipping.")
         return
 
-    # Filter for rows that have shotmap data and explode the shots array.
-    shotmap_df = raw_df.filter(col("content.shotMap.shots").isNotNull()).select(
+    # Filter for rows that have shotmap data and a non-null matchId, then explode the shots array.
+    shotmap_df = raw_df.filter(
+        col("content.shotmap.shots").isNotNull() & col("general.matchId").isNotNull()
+    ).select(
         col("general.matchId").alias("MatchID"),
-        explode(col("content.shotMap.shots")).alias("shot")
+        explode(col("content.shotmap.shots")).alias("shot")
     )
 
     # If the resulting DataFrame is empty, there's nothing to load.
@@ -367,30 +369,35 @@ def fact_player_stats_stg(postgres_args, raw_df):
     '''
     Loading player_stats_fact_stg Table
     '''
-    if "playerStats" not in raw_df.select("content.*").schema.names:
+    if "playerStats" not in raw_df.select("content.*").columns:
         logger.info("playerStats data not found in this file's schema. Skipping.")
         return
 
     # playerStats is a map, so we explode it to get rows for each player
+    # Use coalesce to handle potential nulls in matchId paths
     player_stats_df = raw_df.filter(col("content.playerStats").isNotNull()).select(
-        col("general.matchId").alias("MatchID"),
+        col("content.matchFacts.matchId").alias("MatchID"),
         explode(col("content.playerStats")).alias("player_id_str", "player_data")
     )
-
+    print(player_stats_df.count())
+    print(player_stats_df.show(20))
     if player_stats_df.rdd.isEmpty():
         logger.info("playerStats data is null or empty. Skipping.")
         return
 
     # Extract base player info and explode stat groups
+    # Use coalesce for PlayerID as a fallback, casting the map key to Long
     base_df = player_stats_df.select(
         "MatchID",
-        col("player_data.id").alias("PlayerID"),
+        coalesce(col("player_data.id"), col("player_id_str").cast(LongType())).alias("PlayerID"),
         col("player_data.teamId").alias("TeamID"),
         col("player_data.isGoalkeeper").alias("IsGoalkeeper"),
         col("player_data.funFacts").getItem(0).getField('fallback').alias("FunFact"),
         col("player_data.shotmap").getItem(0).getField('id').alias("ShotMapID"),
         explode(col("player_data.stats")).alias("stat_group")
     )
+    
+    base_df = base_df.filter(col("PlayerID").isNotNull())
 
     # From each stat group, get the map of stats
     stats_df = base_df.select(
