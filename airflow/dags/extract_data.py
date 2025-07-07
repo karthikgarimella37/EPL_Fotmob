@@ -102,14 +102,15 @@ def check_existing_matches(engine):
             return last_match
         
 
-def fetch_all_season_matches(session, start_year=2014, end_year=2024):
+def fetch_all_season_matches(session, start_year=2014, end_year=2025):
     '''
     Fetch all EPL matches from the given range of seasons using the provided session
     '''
     all_matches = []
-    for year in range(start_year, end_year):
+    for year in range(start_year, end_year):\
+    # header has to be modularized or needs to be changed for each new run (once header key expires, I guess)
         headers = {
-    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9tYXRjaERldGFpbHM/bWF0Y2hJZD00NjkwMzkzIiwiY29kZSI6MTc1MTY2MzQ3MzM3NiwiZm9vIjoicHJvZHVjdGlvbjowMGY3ZjViY2RmZDgzYjZmNmFiMWVkODQxM2YzZTlkMjcxZmE3NDRmLXVuZGVmaW5lZCJ9LCJzaWduYXR1cmUiOiI1NEIxQzEyNkVBNENFRUQxQkVDOTkwQjBBQjJFNDJDOSJ9"
+    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9tYXRjaERldGFpbHM/bWF0Y2hJZD0xOTg3MDc5IiwiY29kZSI6MTc1MTg0Mzg3Njc4NiwiZm9vIjoicHJvZHVjdGlvbjowMGY3ZjViY2RmZDgzYjZmNmFiMWVkODQxM2YzZTlkMjcxZmE3NDRmLXVuZGVmaW5lZCJ9LCJzaWduYXR1cmUiOiJEMkVFRDAyQzg5MEFBMDU4QUI5QjZGNDNBRjNGMDM4MyJ9"
                     }
         url = f"https://www.fotmob.com/api/fixtures?id=47&season={year}%2F{year+1}"
         try:
@@ -138,7 +139,7 @@ def fetch_match_details(session, match_id):
     Fetch details of a given match using the provided session
     '''
     headers = {
-    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9tYXRjaERldGFpbHM/bWF0Y2hJZD00NjkwMzkzIiwiY29kZSI6MTc1MTY2MzQ3MzM3NiwiZm9vIjoicHJvZHVjdGlvbjowMGY3ZjViY2RmZDgzYjZmNmFiMWVkODQxM2YzZTlkMjcxZmE3NDRmLXVuZGVmaW5lZCJ9LCJzaWduYXR1cmUiOiI1NEIxQzEyNkVBNENFRUQxQkVDOTkwQjBBQjJFNDJDOSJ9"
+    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9tYXRjaERldGFpbHM/bWF0Y2hJZD0xOTg3MDc5IiwiY29kZSI6MTc1MTg0Mzg3Njc4NiwiZm9vIjoicHJvZHVjdGlvbjowMGY3ZjViY2RmZDgzYjZmNmFiMWVkODQxM2YzZTlkMjcxZmE3NDRmLXVuZGVmaW5lZCJ9LCJzaWduYXR1cmUiOiJEMkVFRDAyQzg5MEFBMDU4QUI5QjZGNDNBRjNGMDM4MyJ9"
                     }
     url = f"https://www.fotmob.com/api/matchDetails?matchId={match_id}"
     try:
