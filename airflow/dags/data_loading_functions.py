@@ -306,19 +306,22 @@ def fact_player_shotmap_stg(postgres_args, raw_df):
     '''
     Loading player_shotmap_fact_stg Table
     '''
+    shotmap_df = raw_df.filter(
+        col("content.shotmap.shots").isNotNull() & col("content.matchFacts.matchId").isNotNull()
+    ).select(
+        col("content.matchFacts.matchId").alias("MatchID"),
+        explode(col("content.shotmap.shots")).alias("shot")
+    )
+    print(shotmap_df.count())
+    print(shotmap_df.show(20))
     # Check if shotmap data is available in the schema for this file.
-    if not "shotmap" in raw_df.select("content.*").schema.names or \
-       not "shots" in raw_df.select("content.shotmap.*").schema.names:
+    if not "shotmap" in raw_df.select("content.*").columns or \
+       not "shots" in raw_df.select("content.shotmap.*").columns:
         logger.info("Shotmap data not found in this file's schema. Skipping.")
         return
 
     # Filter for rows that have shotmap data and a non-null matchId, then explode the shots array.
-    shotmap_df = raw_df.filter(
-        col("content.shotmap.shots").isNotNull() & col("general.matchId").isNotNull()
-    ).select(
-        col("general.matchId").alias("MatchID"),
-        explode(col("content.shotmap.shots")).alias("shot")
-    )
+    
 
     # If the resulting DataFrame is empty, there's nothing to load.
     if shotmap_df.rdd.isEmpty():
@@ -389,7 +392,7 @@ def fact_player_stats_stg(postgres_args, raw_df):
     # Use coalesce for PlayerID as a fallback, casting the map key to Long
     base_df = player_stats_df.select(
         "MatchID",
-        coalesce(col("player_data.id"), col("player_id_str").cast(LongType())).alias("PlayerID"),
+        coalesce( col("player_id_str").cast(LongType()), col("player_data.id"),).alias("PlayerID"),
         col("player_data.teamId").alias("TeamID"),
         col("player_data.isGoalkeeper").alias("IsGoalkeeper"),
         col("player_data.funFacts").getItem(0).getField('fallback').alias("FunFact"),
