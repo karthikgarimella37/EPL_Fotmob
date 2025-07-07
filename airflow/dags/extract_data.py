@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+from datetime import datetime
 import psycopg2 as psy
 from dotenv import load_dotenv
 from google.cloud import storage
@@ -102,7 +103,7 @@ def check_existing_matches(engine):
             return last_match
         
 
-def fetch_all_season_matches(session, start_year=2014, end_year=2025):
+def fetch_all_season_matches(session, start_year=2014, end_year= datetime.now().year + 1):
     '''
     Fetch all EPL matches from the given range of seasons using the provided session
     '''
