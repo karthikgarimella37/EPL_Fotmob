@@ -361,11 +361,7 @@ def custom_schema():
             StructField("matchFacts", StructType([
                 StructField("matchId", LongType(), True),
                 StructField("highlights", StringType(), True), # Null in data
-                StructField("playerOfTheMatch", StructType([
-                    StructField("id", LongType(), True),
-                    StructField("name", StringType(), True),
-                    StructField("profileUrl", StringType(), True)
-                ]), True), # Empty object in data
+                StructField("playerOfTheMatch", StructType([]), True), # Empty object in data
                 StructField("matchesInRound", ArrayType(
                     StructType([
                         StructField("id", StringType(), True),
