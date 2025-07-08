@@ -361,7 +361,11 @@ def custom_schema():
             StructField("matchFacts", StructType([
                 StructField("matchId", LongType(), True),
                 StructField("highlights", StringType(), True), # Null in data
-                StructField("playerOfTheMatch", StructType([]), True), # Empty object in data
+                StructField("playerOfTheMatch", StructType([
+                    StructField("id", LongType(), True),
+                    StructField("name", StringType(), True),
+                    StructField("profileUrl", StringType(), True)
+                ]), True), # Empty object in data
                 StructField("matchesInRound", ArrayType(
                     StructType([
                         StructField("id", StringType(), True),
@@ -484,7 +488,10 @@ def custom_schema():
                     ]), True),
                     StructField("Stadium", StructType([
                         StructField("name", StringType(), True),
-                        StructField("country", StringType(), True)
+                        StructField("city", StringType(), True),
+                        StructField("country", StringType(), True),
+                        StructField("lat", FloatType(), True),
+                        StructField("long", FloatType(), True)
                     ]), True),
                     StructField("Referee", StructType([
                         StructField("imgUrl", StringType(), True),
@@ -544,7 +551,14 @@ def custom_schema():
             ]), True),
             StructField("liveticker", StructType([
                 StructField("langs", StringType(), True),
-                StructField("teams", ArrayType(StringType()), True)
+                StructField("teams", ArrayType(StringType()), True),
+                StructField("matches", ArrayType(
+                    StructType([
+                        StructField("time", StructType([
+                            StructField("utcTime", StringType(), True) # Consider TimestampType()
+                        ]), True)
+                    ])
+                ), True)
             ]), True),
             StructField("superlive", StructType([
                 StructField("superLiveUrl", StringType(), True), # Null in data
@@ -778,7 +792,7 @@ def custom_schema():
                     ])
                 ), True)
             ]), True),
-            StructField("momentum", BooleanType(), True) # Assuming boolean based on value
+            StructField("momentum", StringType(), True)
         ]), True),
         StructField("seo", StructType([
             StructField("path", StringType(), True),
@@ -884,11 +898,11 @@ def load_to_staging(spark_session, gcs_path, schema, postgres_args):
     # Load Dim Stg Tables
     # dim_team_stg(postgres_args, raw_df)
     # dim_player_stg(postgres_args, raw_df)
-    # dim_match_stg(postgres_args, raw_df)
+    dim_match_stg(postgres_args, raw_df)
     # dim_league_stg(postgres_args, raw_df)
     # fact_match_lineup_stg(postgres_args, raw_df)
     # fact_player_shotmap_stg(postgres_args, raw_df)
-    fact_player_stats_stg(postgres_args, raw_df)
+    # fact_player_stats_stg(postgres_args, raw_df)
 
 
 def main():

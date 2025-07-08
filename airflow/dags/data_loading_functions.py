@@ -159,8 +159,6 @@ def dim_match_stg(postgres_args, raw_df):
     '''
     Loading match_dim_stg Table
     '''
-    schema = raw_df.schema
-
     select_exprs = [
         col("content.matchFacts.matchId").alias("MatchID"),
         concat(col("general.homeTeam.name"), lit(" vs "), col("general.awayTeam.name")).alias("MatchName"),
@@ -168,49 +166,26 @@ def dim_match_stg(postgres_args, raw_df):
         col("content.matchFacts.infoBox.Tournament.round").alias("MatchRound"),
         col("general.leagueId").alias("LeagueID"),
         col("general.homeTeam.id").alias("HomeTeamID"),
-        col("general.awayTeam.id").alias("AwayTeamID")
+        col("general.awayTeam.id").alias("AwayTeamID"),
+        lit(None).cast("string").alias("SeasonName"),
+        col("content.matchFacts.infoBox.Stadium.name").alias("StadiumName"),
+        col("content.matchFacts.infoBox.Attendance").cast("int").alias("Attendance"),
+        col("content.matchFacts.infoBox.Referee.text").alias("RefereeName"),
+        col("content.matchFacts.infoBox.Stadium.lat").alias("MatchLatitude"),
+        col("content.matchFacts.infoBox.Stadium.long").alias("MatchLongitude"),
+        col("content.matchFacts.highlights").alias("MatchHighlightsUrl"),
+        col("content.matchFacts.countryCode").alias("MatchCountryCode"),
+        col("content.matchFacts.playerOfTheMatch.id").alias("PlayerOfTheMatchID"),
+        col("content.momentum").alias("Momentum"),
+        # Handle QAData separately due to array access
+        col("content.matchFacts.QAData").getItem(0).getField("question").alias("MatchQAQuestion"),
+        col("content.matchFacts.QAData").getItem(0).getField("answer").alias("MatchQAAnswer")
     ]
 
-    # Optional columns check
-    optional_cols = {
-        "SeasonName": ("general.leagueSeason", "string"),
-        "StadiumName": ("content.matchFacts.infoBox.Stadium.name", "string"),
-        "Attendance": ("content.matchFacts.infoBox.Attendance", "int"),
-        "RefereeName": ("content.matchFacts.infoBox.Referee.text", "string"),
-        "MatchLatitude": ("content.matchFacts.infoBox.Stadium.lat", "float"),
-        "MatchLongitude": ("content.matchFacts.infoBox.Stadium.lon", "float"),
-        "MatchHighlightsUrl": ("content.matchFacts.highlights", "string"),
-        "MatchCountryCode": ("content.matchFacts.countryCode", "string"),
-        "PlayerOfTheMatchID": ("content.matchFacts.playerOfTheMatch.id", "bigint"),
-        "Momentum": ("content.matchFacts.momentum", "string")
-    }
-    
-    # Helper to check nested field existence
-    def field_exists(df_schema, path):
-        fields = path.split('.')
-        current_schema = df_schema
-        
-        for field_name in fields:
-            if not isinstance(current_schema, StructType) or field_name not in current_schema.names:
-                return False
-            current_schema = current_schema[field_name].dataType
-        return True
-
-    for alias, (path, dtype) in optional_cols.items():
-        if field_exists(schema, path):
-            select_exprs.append(col(path).alias(alias))
-        else:
-            select_exprs.append(lit(None).cast(dtype).alias(alias))
-
-    # Handle QAData separately due to array access
-    if field_exists(schema, "content.matchFacts.QAData"):
-        select_exprs.append(col("content.matchFacts.QAData").getItem(0).getField("question").alias("MatchQAQuestion"))
-        select_exprs.append(col("content.matchFacts.QAData").getItem(0).getField("answer").alias("MatchQAAnswer"))
-    else:
-        select_exprs.append(lit(None).cast("string").alias("MatchQAQuestion"))
-        select_exprs.append(lit(None).cast("string").alias("MatchQAAnswer"))
-
     match_facts_df = raw_df.select(select_exprs).dropDuplicates(["MatchID"])
+
+    print(match_facts_df.count())
+    print(match_facts_df.show(20))
 
     logger.info(f"Inserting {match_facts_df.count()} matches into match_dim_stg table.")
     write_to_postgres(match_facts_df, 'match_dim_stg', postgres_args)

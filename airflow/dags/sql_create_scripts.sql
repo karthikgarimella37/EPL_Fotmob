@@ -46,11 +46,11 @@ CREATE TABLE IF NOT EXISTS match_dim_stg (
     MatchLatitude FLOAT,
     MatchLongitude FLOAT,
     MatchHighlightsUrl VARCHAR(255),
-    MatchQAQuestion VARCHAR(255),
-    MatchQAAnswer VARCHAR(255),
     MatchCountryCode VARCHAR(10),
     PlayerOfTheMatchID BIGINT,
-    Momentum VARCHAR(255)
+    Momentum TEXT,
+    MatchQAQuestion VARCHAR(1024),
+    MatchQAAnswer VARCHAR(1024)
 );
 
 -- -- not needed
