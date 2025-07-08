@@ -10,6 +10,7 @@ from create_sql import postgres_connection, create_all_tables_sequences
 from extract_data import main as extract_data_main
 from load_to_staging import main as load_to_staging_main
 from truncate_stg import truncate_stg
+from run_merges import main as run_merges
 
 
 default_args = {
@@ -37,13 +38,15 @@ def upload_to_gcs():
     bucket = storage_client.bucket('terraform-fotmob-terra-bucket-kg')
     blob = bucket.blob('load_to_staging.py')
     blob.upload_from_filename(f"/opt/airflow/dags/load_to_staging.py")
+    blob = bucket.blob('data_loading_functions.py')
+    blob.upload_from_filename(f"/opt/airflow/dags/data_loading_functions.py")
     blob = bucket.blob('deps.zip')
     blob.upload_from_filename(f"/tmp/deps.zip")
     blob = bucket.blob('.env')
     blob.upload_from_filename(env_path)
     blob = bucket.blob('postgresql-42.6.0.jar')
     blob.upload_from_filename(f"/opt/airflow/dags/postgresql-42.6.0.jar")
-    print("PySpark Script, deps.zip, .env, and PostgreSQL JDBC driver JAR uploaded to GCS")
+    print("PySpark Script, deps.zip, .env, PostgreSQL JDBC driver JAR, and data_loading_functions.py uploaded to GCS")
 
     # print("PySpark Script uploaded to GCS")
 
@@ -97,6 +100,11 @@ load_to_staging_task = DataprocSubmitJobOperator(
 
     )
 
-# create_sql_task >> extract_data_task >> upload_gcs_task
-truncate_stg_task >> load_to_staging_task
-# upload_gcs_task >> load_to_staging_task
+merge_dim_fact_task = PythonOperator(
+    task_id = 'merge_dim_fact',
+    python_callable = run_merges,
+    dag = dag
+)
+
+create_sql_task >> extract_data_task >> upload_gcs_task >> truncate_stg_task >> load_to_staging_task >> merge_dim_fact_task
+
