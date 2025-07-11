@@ -1,6 +1,5 @@
 google-cloud-storage==3.1.0
-# numpy==2.0.2
-numpy==1.26.4
+numpy==2.0.2
 pandas==2.2.3
 polars==1.26.0
 psycopg2-binary
@@ -10,3 +9,7 @@ requests-ip-rotator==1.0.14
 SQLAlchemy==2.0.40
 urllib3==1.26.20
 pyspark==3.5.1
+streamlit
+matplotlib
+mplsoccer
+Pillow
