@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS player_shotmap_fact_stg (
     xPosition FLOAT,
     yPosition FLOAT,
     Minute INT,
-    IsBlocked BOOLEAN,,
+    IsBlocked BOOLEAN,
     IsOnTarget BOOLEAN,
     BlockedXPosition FLOAT,
     BlockedYPosition FLOAT,
@@ -268,7 +268,7 @@ CREATE TABLE IF NOT EXISTS match_lineup_fact (
     PlayerOfTheMatch VARCHAR(255),
     IsCaptain BOOLEAN,
     InsertDate TIMESTAMP,
-    UpdateDate TIMESTAMP
+    UpdateDate TIMESTAMP,
     PRIMARY KEY (MatchID, TeamID, PlayerID)    
 );
 
@@ -281,7 +281,7 @@ CREATE TABLE IF NOT EXISTS player_shotmap_fact (
     xPosition FLOAT,
     yPosition FLOAT,
     Minute INT,
-    IsBlocked BOOLEAN,,
+    IsBlocked BOOLEAN,
     IsOnTarget BOOLEAN,
     BlockedXPosition FLOAT,
     BlockedYPosition FLOAT,
@@ -302,7 +302,7 @@ CREATE TABLE IF NOT EXISTS player_shotmap_fact (
     AssistString VARCHAR(255),
     AssistPlayerID BIGINT,
     InsertDate TIMESTAMP,
-    UpdateDate TIMESTAMP
+    UpdateDate TIMESTAMP,
     PRIMARY KEY (MatchID, ShotMapID, PlayerID)
 );
 
@@ -351,6 +351,76 @@ CREATE TABLE IF NOT EXISTS player_stats_fact (
     ShotMapID BIGINT,
     FunFact VARCHAR(255),
     InsertDate TIMESTAMP,
-    UpdateDate TIMESTAMP
+    UpdateDate TIMESTAMP,
     PRIMARY KEY (PlayerID, TeamID, MatchID)
 );
+
+-- View for Shotmap data for Streamlit App
+CREATE OR REPLACE VIEW vw_player_shotmap AS
+SELECT
+    shotmap.ShotMapID,
+    shotmap.MatchID,
+    match.MatchTimeUTC,
+    match.MatchName,
+    match.MatchRound,
+    match.LeagueID,
+    match.HomeTeamID MatchHomeTeam,
+    match.AwayTeamID MatchAwayTeam,
+    match.SeasonName,
+
+    -- Player Info
+    shotmap.PlayerID,
+    'https://images.fotmob.com/image_resources/playerimages/' || shotmap.PlayerID || '.png' AS PlayerImageUrl,
+    player.PlayerName,
+    player.FirstName,
+    player.LastName,
+
+    -- Player's Team Info
+    lineup.TeamID AS PlayerTeamID,
+    player_team.TeamName AS PlayerTeamName,
+
+    -- Opponent Team Info
+    CASE
+        WHEN lineup.TeamID = match.HomeTeamID THEN match.AwayTeamID
+        ELSE match.HomeTeamID
+    END AS OpponentTeamID,
+    CASE
+        WHEN lineup.TeamID = match.HomeTeamID THEN away_team.TeamName
+        ELSE home_team.TeamName
+    END AS OpponentTeamName,
+    
+    home_team.TeamName as HomeTeamName,
+    home_team.imageurl MatchHomeImageUrl,
+    home_team.pageurl MatchHomePageUrl,
+    away_team.TeamName as AwayTeamName,
+    away_team.imageurl MatchAwayImageUrl,
+    away_team.pageurl MatchAwayPageUrl,
+    match.HomeTeamID,
+    match.AwayTeamID,
+
+    -- Shot Info
+    shotmap.EventType,
+    shotmap.xPosition,
+    shotmap.yPosition,
+    shotmap.Minute,
+    shotmap.ExpectedGoals,
+    shotmap.ShotType,
+    shotmap.Situation,
+    shotmap.Period,
+    shotmap.IsOnTarget,
+    (LOWER(shotmap.EventType) = 'goal' AND shotmap.IsOwnGoal = FALSE) AS IsGoal,
+    shotmap.IsOwnGoal
+
+FROM
+    player_shotmap_fact AS shotmap
+JOIN player_dim AS player ON shotmap.PlayerID = player.PlayerID
+JOIN match_lineup_fact AS lineup ON shotmap.PlayerID = lineup.PlayerID AND shotmap.MatchID = lineup.MatchID
+JOIN team_dim AS player_team ON lineup.TeamID = player_team.TeamID
+JOIN match_dim AS match ON shotmap.MatchID = match.MatchID
+JOIN team_dim AS home_team ON match.HomeTeamID = home_team.TeamID
+JOIN team_dim AS away_team ON match.AwayTeamID = away_team.TeamID;
+
+
+
+
+
