@@ -9,7 +9,12 @@ WHEN MATCHED THEN
         LeagueID = stg.LeagueID,
         HomeTeamID = stg.HomeTeamID,
         AwayTeamID = stg.AwayTeamID,
-        SeasonName = stg.SeasonName,
+        SeasonName = CASE
+        WHEN EXTRACT(MONTH FROM stg.MatchTimeUTC) >= 8 THEN
+            EXTRACT(YEAR FROM stg.MatchTimeUTC)::VARCHAR || '/' || (EXTRACT(YEAR FROM stg.MatchTimeUTC) + 1)::VARCHAR
+        ELSE
+            (EXTRACT(YEAR FROM stg.MatchTimeUTC) - 1)::VARCHAR || '/' || EXTRACT(YEAR FROM stg.MatchTimeUTC)::VARCHAR
+    END,
         StadiumName = stg.StadiumName,
         Attendance = stg.Attendance,
         RefereeName = stg.RefereeName,
@@ -53,7 +58,12 @@ WHEN NOT MATCHED THEN
         stg.LeagueID,
         stg.HomeTeamID,
         stg.AwayTeamID,
-        stg.SeasonName,
+        CASE
+        WHEN EXTRACT(MONTH FROM stg.MatchTimeUTC) >= 8 THEN
+            EXTRACT(YEAR FROM stg.MatchTimeUTC)::VARCHAR || '/' || (EXTRACT(YEAR FROM stg.MatchTimeUTC) + 1)::VARCHAR
+        ELSE
+            (EXTRACT(YEAR FROM stg.MatchTimeUTC) - 1)::VARCHAR || '/' || EXTRACT(YEAR FROM stg.MatchTimeUTC)::VARCHAR
+    END,
         stg.StadiumName,
         stg.Attendance,
         stg.RefereeName,
