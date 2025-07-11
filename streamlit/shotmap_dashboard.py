@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
+from matplotlib.colors import LinearSegmentedColormap
 from mplsoccer import VerticalPitch, FontManager, add_image
 from db_connection import postgres_connection
 import requests
@@ -94,8 +95,26 @@ def run():
     pitch = VerticalPitch(pad_bottom=1, half=True, goal_type='box', goal_alpha=0.8,
                           pitch_type='uefa', pitch_length=99.5, pitch_width=100)
     fig, ax = pitch.draw(figsize=(12, 10))
-    fig.set_facecolor('#22312b')
-    ax.patch.set_facecolor('#22312b')
+    # fig.set_facecolor('#22312b')
+    # ax.patch.set_facecolor('#22312b')
+    fig.set_facecolor('black')
+    ax.patch.set_facecolor('black')
+
+
+    # --- KDE Heatmap 
+    if not filtered_df.empty:
+        pitch.kdeplot(
+            filtered_df['xposition'],
+            filtered_df['yposition'],
+            ax=ax,
+            fill=True,
+            levels=100,
+            thresh=0.1,
+            cut=4,
+            cmap='Blues',
+            alpha=0.3,  # Make it semi-transparen
+            zorder=1      # Ensure it's above pitch lines but below shots
+        )
 
     # Add player image to the top-left
     if not player_df.empty:
@@ -144,26 +163,32 @@ def run():
             linewidths=1.5,
             marker=marker,
             ax=ax,
-            alpha=0.8
+            alpha=0.8,
+            zorder=2 # Higher zorder to be on top of the heatmap
         )
+
+        
 
     # --- Title and Subtitle ---
     total_shots = filtered_df.shape[0]
     total_goals = filtered_df[filtered_df['isgoal'] == True].shape[0]
+    total_xg = filtered_df['expectedgoals'].sum()
+    xg_per_shot = total_xg / total_shots if total_shots > 0 else 0
+
     title_text = f"{player_filter} Shot Map"
-    stats_line = f"Total Shots: {total_shots} | Total Goals: {total_goals}"
+    stats_line = f"Shots: {total_shots} | Goals: {total_goals}  \nxG: {total_xg:.2f} | xG/Shot: {xg_per_shot:.2f}"
     
     subtitle_parts = []
     if season_filter != "All":
-        subtitle_parts.append(f"Season: {season_filter}")
+        subtitle_parts.append(f"Season:{season_filter}")
     if opponent_filter != "All":
         subtitle_parts.append(f"vs {opponent_filter}")
     subtitle = " | ".join(subtitle_parts)
 
     fig.text(0.5, 0.99, title_text, ha='center', va='top', fontproperties=fm_rubik.prop, fontsize=20, color='white')
-    fig.text(0.5, 0.95, stats_line, ha='center', va='top', fontproperties=fm_rubik.prop, fontsize=15, color='white')
+    fig.text(0.5, 0.3, stats_line, ha='center', va='top', fontproperties=fm_rubik.prop, fontsize=15, color='white')
     if subtitle:
-        fig.text(0.5, 0.3, subtitle, ha='center', va='top', fontproperties=fm_rubik.prop, fontsize=15, color='white')
+        fig.text(0.5, 0.95, subtitle, ha='center', va='top', fontproperties=fm_rubik.prop, fontsize=15, color='white')
 
     # --- Dynamic Legend ---
     # Legend for Event Types
@@ -180,14 +205,14 @@ def run():
 
     event_legend = ax.legend(handles=event_handles, loc='upper right', 
                              title='Event Types', frameon=True, fontsize=10,
-                             bbox_to_anchor=(1, 1),
+                             bbox_to_anchor=(1, 1.1),
                              labelcolor='black', title_fontsize=12,
                              facecolor='white',
                              edgecolor='black')
     ax.add_artist(event_legend)
 
     # Legend for xG (size of markers)
-    xg_sizes = [0.1, 0.3, 0.5, 0.7]
+    xg_sizes = [0.1, 0.3, 0.5, 0.7, 0.9]
     xg_handles = []
     for xg in xg_sizes:
         size = (xg * 720) 
@@ -197,7 +222,7 @@ def run():
     
     xg_legend = ax.legend(handles=xg_handles, loc='upper right',
                          title='Expected Goals (xG)', frameon=True, fontsize=10,
-                         bbox_to_anchor=(1, 0.85),
+                         bbox_to_anchor=(1, 0.9),
                          labelcolor='black', title_fontsize=12,
                          facecolor='white',
                          edgecolor='black')
