@@ -72,6 +72,8 @@ def run():
     seasons = sorted(player_df['seasonname'].dropna().unique())
     season_filter = st.sidebar.selectbox("Season (optional)", ["All"] + seasons)
 
+    show_heatmap = st.sidebar.checkbox("Show Heatmap", value=True)
+
     # --- Data Filtering Logic ---
     filtered_df = player_df.copy()
     if selected_event_types:
@@ -101,8 +103,8 @@ def run():
     ax.patch.set_facecolor('black')
 
 
-    # --- KDE Heatmap 
-    if not filtered_df.empty:
+    # --- KDE Heatmap (conditional)
+    if show_heatmap and not filtered_df.empty:
         pitch.kdeplot(
             filtered_df['xposition'],
             filtered_df['yposition'],
