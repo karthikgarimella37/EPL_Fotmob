@@ -19,6 +19,23 @@ def load_match_facts_data():
         st.error(f"Database error loading match facts: {e}")
         return pd.DataFrame()
 
+@st.cache_data
+def load_player_match_analytics(match_id):
+    """Loads player match analytics for a given match_id."""
+    if not match_id:
+        return pd.DataFrame()
+    try:
+        engine = postgres_connection()
+        with engine.connect() as conn:
+            # Use parameterized query to prevent SQL injection
+            query = "SELECT * FROM vw_player_match_analytics WHERE matchid = %(match_id)s;"
+            params = {'match_id': int(match_id)}
+            df = pd.read_sql(query, conn, params=params)
+        return df
+    except Exception as e:
+        st.error(f"Database error loading player match analytics: {e}")
+        return pd.DataFrame()
+
 def create_momentum_chart(match_data):
     """Creates and returns a matplotlib figure for the momentum chart."""
     try:
@@ -144,12 +161,12 @@ def run():
         st.warning("Selected match not found. Try adjusting filters.")
         st.stop()
 
-   
-
-    st.divider()
+    match_id = match_data['matchid'].iloc[0]
+    player_stats_df = load_player_match_analytics(match_id)
 
 
     # --- Match Header ---
+    st.divider()
     home_team, score, away_team = st.columns([1, 0.5, 1])
     with home_team:
         st.image(match_data['hometeamimageurl'].iloc[0], width=80)
@@ -250,4 +267,59 @@ def run():
         with col1:
             display_lineup(match_data['homelineup'].iloc[0], match_data['hometeamname'].iloc[0])
         with col2:
-            display_lineup(match_data['awaylineup'].iloc[0], match_data['awayteamname'].iloc[0]) 
+            display_lineup(match_data['awaylineup'].iloc[0], match_data['awayteamname'].iloc[0])
+
+    # --- Advanced Stats ---
+    with st.expander("View Advanced Team Stats"):
+        if player_stats_df.empty:
+            st.warning("Advanced player stats are not available for this match.")
+        else:
+            home_team_id = match_data['hometeamid'].iloc[0]
+            away_team_id = match_data['awayteamid'].iloc[0]
+            home_color = match_data['hometeamcolor'].iloc[0] or '#d3151e'
+            away_color = match_data['awayteamcolor'].iloc[0] or '#4a72d4'
+
+            home_stats = player_stats_df[player_stats_df['teamid'] == home_team_id]
+            away_stats = player_stats_df[player_stats_df['teamid'] == away_team_id]
+
+            def stat_row(label, home_val, away_val, is_float=False):
+                home_disp = f"{home_val:.2f}" if is_float else f"{int(home_val)}"
+                away_disp = f"{away_val:.2f}" if is_float else f"{int(away_val)}"
+                
+                col1, col2, col3 = st.columns([1, 1.5, 1])
+                with col1:
+                    st.markdown(f"<p style='color:{home_color}; text-align:center; font-weight:bold;'>{home_disp}</p>", unsafe_allow_html=True)
+                with col2:
+                    st.markdown(f"<p style='text-align:center;'>{label}</p>", unsafe_allow_html=True)
+                with col3:
+                    st.markdown(f"<p style='color:{away_color}; text-align:center; font-weight:bold;'>{away_disp}</p>", unsafe_allow_html=True)
+
+            # Define stats to display
+            advanced_stats = {
+                "Attacking": [
+                    ("Expected Goals (xG)", "expectedgoals", True),
+                    ("Expected Assists (xA)", "expectedassists", True),
+                    ("Successful Dribbles", "successfuldribbles", False),
+                    ("Touches in Opp. Box", "touchesinoppbox", False)
+                ],
+                "Passing": [
+                    ("Accurate Passes", "accuratepasses", False),
+                    ("Passes into Final Third", "passesintofinalthird", False),
+                    ("Chances Created", "chancescreated", False)
+                ],
+                "Defending": [
+                    ("Tackles Won", "tackleswon", False),
+                    ("Interceptions", "interceptions", False),
+                    ("Recoveries", "recoveries", False),
+                    ("Duels Won", "duelswon", False),
+                    ("Clearances", "clearances", False)
+                ]
+            }
+
+            for category, stats_list in advanced_stats.items():
+                st.subheader(category)
+                for label, key, is_float in stats_list:
+                    home_val = home_stats[key].sum()
+                    away_val = away_stats[key].sum()
+                    stat_row(label, home_val, away_val, is_float)
+                st.divider() 
