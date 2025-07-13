@@ -21,39 +21,43 @@ def load_match_facts_data():
 
 def create_momentum_chart(match_data):
     """Creates and returns a matplotlib figure for the momentum chart."""
-    momentum_data = match_data['momentum'].iloc[0]
-    # The actual data is nested one level deeper under the 'data' key
-    if not momentum_data or 'main' not in momentum_data or 'data' not in momentum_data['main']:
-        return None, None
+    try:
+        momentum_data = match_data['momentum'].iloc[0]
+        # Check for empty or malformed data
+        if not momentum_data or 'main' not in momentum_data or 'data' not in momentum_data['main'] or not momentum_data['main']['data']:
+            return None
 
-    # Create the DataFrame from the correct path
-    df_momentum = pd.DataFrame(momentum_data['main']['data'])
-    
-    if df_momentum.empty or 'value' not in df_momentum.columns:
-        return None, None
-
-    df_momentum['value'] = pd.to_numeric(df_momentum['value'])
-    
-    home_color = match_data['hometeamcolor'].iloc[0] if match_data['hometeamcolor'].iloc[0] else '#d3151e'
-    away_color = match_data['awayteamcolor'].iloc[0] if match_data['awayteamcolor'].iloc[0] else '#4a72d4'
-    
-    fig, ax = plt.subplots(figsize=(8, 4))
-    fig.set_facecolor('#121212')
-    ax.set_facecolor('#121212')
-
-    ax.fill_between(df_momentum.index, 0, df_momentum['value'], where=df_momentum['value'] >= 0, interpolate=True, color=home_color, alpha=0.8)
-    ax.fill_between(df_momentum.index, 0, df_momentum['value'], where=df_momentum['value'] < 0, interpolate=True, color=away_color, alpha=0.8)
-    
-    ax.axhline(0, color='white', linewidth=0.5)
-    ax.set_xticks([0, len(df_momentum) / 2, len(df_momentum)])
-    ax.set_xticklabels(["0'", 'HT', 'FT'], color='white', fontsize=12)
-    ax.set_yticks([])
-    
-    for spine in ax.spines.values():
-        spine.set_visible(False)
+        # Create the DataFrame from the correct path
+        df_momentum = pd.DataFrame(momentum_data['main']['data'])
         
-    ax.set_title('Momentum', color='white', fontsize=16)
-    return fig
+        if df_momentum.empty or 'value' not in df_momentum.columns:
+            return None
+
+        df_momentum['value'] = pd.to_numeric(df_momentum['value'])
+        
+        home_color = match_data['hometeamcolor'].iloc[0] if match_data['hometeamcolor'].iloc[0] else '#d3151e'
+        away_color = match_data['awayteamcolor'].iloc[0] if match_data['awayteamcolor'].iloc[0] else '#4a72d4'
+        
+        fig, ax = plt.subplots(figsize=(8, 4))
+        fig.set_facecolor('#121212')
+        ax.set_facecolor('#121212')
+
+        ax.fill_between(df_momentum.index, 0, df_momentum['value'], where=df_momentum['value'] >= 0, interpolate=True, color=home_color, alpha=0.8)
+        ax.fill_between(df_momentum.index, 0, df_momentum['value'], where=df_momentum['value'] < 0, interpolate=True, color=away_color, alpha=0.8)
+        
+        ax.axhline(0, color='white', linewidth=0.5)
+        ax.set_xticks([0, len(df_momentum) / 2, len(df_momentum)])
+        ax.set_xticklabels(["0'", 'HT', 'FT'], color='white', fontsize=12)
+        ax.set_yticks([])
+        
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+            
+        ax.set_title('Momentum', color='white', fontsize=16)
+        return fig
+    except Exception:
+        # If any error occurs, just skip creating the chart
+        return None
 
 def get_contrasting_text_color(hex_color):
     """Returns black or white for text depending on the background hex color's brightness."""
@@ -65,17 +69,27 @@ def get_contrasting_text_color(hex_color):
     luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
     return '#000000' if luminance > 0.5 else '#FFFFFF'
 
-def display_lineup(lineup_json, team_name):
+def display_lineup(lineup_data, team_name):
     """Displays the starting lineup for a team."""
-    st.subheader(f"{team_name} Lineup")
-    lineup = json.loads(lineup_json)
-    starters = [p for p in lineup if p['IsStarter']]
-    
+    st.subheader(f"{team_name} Starters")
+
+    # Data is already parsed from JSON by the DB driver
+    if not lineup_data or not isinstance(lineup_data, list):
+        st.write("Lineup data not available.")
+        return
+
+    starters = [p for p in lineup_data if p.get('IsStarter')]
+
+    if not starters:
+        st.write("No starters listed.")
+        return
+
     cols = st.columns(4)
     for i, player in enumerate(starters):
         with cols[i % 4]:
-            st.image(player['PlayerImageUrl'], width=60)
-            st.caption(player['PlayerName'])
+            # Use .get() for safer dictionary access
+            st.image(player.get('PlayerImageUrl', ''), width=60)
+            st.caption(player.get('PlayerName', 'N/A'))
 
 def run():
     """Main function to run the Match Facts Dashboard."""
@@ -91,13 +105,43 @@ def run():
     seasons = sorted(df['seasonname'].dropna().unique(), reverse=True)
     selected_season = st.sidebar.selectbox("Select Season", seasons)
     
-    season_matches = df[df['seasonname'] == selected_season]
-    match_options = season_matches['matchname'].unique()
-    selected_match_name = st.sidebar.selectbox("Select Match", match_options)
+    season_df = df[df['seasonname'] == selected_season].copy()
     
-    match_data = season_matches[season_matches['matchname'] == selected_match_name]
+    # Match Round Filter
+    match_rounds = ["All"] + sorted(season_df['matchround'].dropna().unique())
+    selected_round = st.sidebar.selectbox("Select Match Round", match_rounds)
+    
+    # Start with the full season data, then narrow down
+    filtered_df = season_df.copy()
+    if selected_round != "All":
+        filtered_df = filtered_df[filtered_df['matchround'] == selected_round]
+
+    # Dynamic Home & Away Team Filters
+    home_teams = ["All"] + sorted(filtered_df['hometeamname'].unique())
+    selected_home_team = st.sidebar.selectbox("Select Home Team", home_teams)
+    
+    # If a home team is selected, filter the away team options
+    if selected_home_team != "All":
+        filtered_df = filtered_df[filtered_df['hometeamname'] == selected_home_team]
+
+    away_teams = ["All"] + sorted(filtered_df['awayteamname'].unique())
+    selected_away_team = st.sidebar.selectbox("Select Away Team", away_teams)
+
+    # If an away team is selected, filter the dataframe further
+    if selected_away_team != "All":
+        filtered_df = filtered_df[filtered_df['awayteamname'] == selected_away_team]
+
+    # --- Final Match Selection ---
+    match_options = filtered_df['matchname'].unique()
+    if len(match_options) == 1:
+        selected_match_name = match_options[0]
+        st.sidebar.info(f"Auto-selected match: {selected_match_name}")
+    else:
+        selected_match_name = st.sidebar.selectbox("Select Match", match_options)
+    
+    match_data = filtered_df[filtered_df['matchname'] == selected_match_name]
     if match_data.empty:
-        st.warning("Selected match not found.")
+        st.warning("Selected match not found. Try adjusting filters.")
         st.stop()
 
     # --- Match Header ---
