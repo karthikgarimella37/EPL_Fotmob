@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from db_connection import postgres_connection
 
 @st.cache_data
@@ -34,6 +35,22 @@ def load_player_match_analytics(match_id):
         return df
     except Exception as e:
         st.error(f"Database error loading player match analytics: {e}")
+        return pd.DataFrame()
+
+@st.cache_data
+def load_shotmap_data(match_id):
+    """Loads shotmap data for a given match_id from the vw_player_shotmap view."""
+    if not match_id:
+        return pd.DataFrame()
+    try:
+        engine = postgres_connection()
+        with engine.connect() as conn:
+            query = "SELECT * FROM vw_player_shotmap WHERE matchid = %(match_id)s;"
+            params = {'match_id': int(match_id)}
+            df = pd.read_sql(query, conn, params=params)
+        return df
+    except Exception as e:
+        st.error(f"Database error loading shotmap data: {e}")
         return pd.DataFrame()
 
 def create_momentum_chart(match_data):
@@ -254,9 +271,10 @@ def run():
             "Total shots": (match_data['homeshots'].iloc[0], match_data['awayshots'].iloc[0])
         }
         for stat, values in stats.items():
-            c1, c2, c3 = st.columns([1, 0.5, 1])
+            c1, c2, c3 = st.columns([1, 1, 1])
             c1.metric(label="", value=f"{values[0]:.2f}" if isinstance(values[0], float) else values[0])
-            c2.text(stat)
+            with c2:
+                st.markdown(f"<div style='text-align: left; padding-top: 2rem;'>{stat}</div>", unsafe_allow_html=True)
             c3.metric(label="", value=f"{values[1]:.2f}" if isinstance(values[1], float) else values[1])
 
     st.divider()
@@ -269,6 +287,15 @@ def run():
         with col2:
             display_lineup(match_data['awaylineup'].iloc[0], match_data['awayteamname'].iloc[0])
 
+    # --- xG Race Plot ---
+    with st.expander("View xG Race Plot"):
+        shotmap_df = load_shotmap_data(match_id)
+        if shotmap_df.empty:
+            st.warning("Shotmap data not available for this match.")
+        else:
+            fig = create_xg_race_plot(shotmap_df, match_data)
+            st.plotly_chart(fig, use_container_width=True)
+            
     # --- Advanced Stats ---
     with st.expander("View Advanced Team Stats"):
         if player_stats_df.empty:
@@ -323,3 +350,92 @@ def run():
                     away_val = away_stats[key].sum()
                     stat_row(label, home_val, away_val, is_float)
                 st.divider() 
+
+def create_xg_race_plot(shotmap_df, match_data):
+    """Creates and returns a Plotly figure for the xG race plot."""
+    
+    home_team_id = match_data['hometeamid'].iloc[0]
+    away_team_id = match_data['awayteamid'].iloc[0]
+    home_team_name = match_data['hometeamname'].iloc[0]
+    away_team_name = match_data['awayteamname'].iloc[0]
+    home_color = match_data['hometeamcolor'].iloc[0] or '#d3151e'
+    away_color = match_data['awayteamcolor'].iloc[0] or '#4a72d4'
+
+    df = shotmap_df.copy()
+    df = df.astype({"expectedgoals": float, "minute": int})
+
+    # Separate home and away shots
+    df_home = df[df['playerteamid'] == home_team_id].sort_values('minute')
+    df_away = df[df['playerteamid'] == away_team_id].sort_values('minute')
+
+    # Calculate cumulative xG
+    df_home['xgcum'] = df_home['expectedgoals'].cumsum()
+    df_away['xgcum'] = df_away['expectedgoals'].cumsum()
+    
+    # Get goal events for annotations
+    goals_home = df_home[df_home['isgoal'] == True]
+    goals_away = df_away[df_away['isgoal'] == True]
+
+    # Create figure
+    fig = go.Figure()
+
+    # Add step plots for cumulative xG
+    fig.add_trace(go.Scatter(
+        x=df_home['minute'], y=df_home['xgcum'], name=home_team_name,
+        line_shape='hv', line=dict(color=home_color, width=3),
+        mode='lines'
+    ))
+    fig.add_trace(go.Scatter(
+        x=df_away['minute'], y=df_away['xgcum'], name=away_team_name,
+        line_shape='hv', line=dict(color=away_color, width=3),
+        mode='lines'
+    ))
+
+    # Add markers for goals
+    fig.add_trace(go.Scatter(
+        x=goals_home['minute'], y=goals_home['xgcum'],
+        mode='markers+text',
+        marker=dict(color=home_color, size=18, line=dict(color='white', width=1.5)),
+        text=goals_home['expectedgoals'].round(2),
+        textfont=dict(color='white', size=9),
+        textposition="middle center",
+        hoverinfo='text',
+        hovertext=goals_home['playername'] + ' (' + goals_home['minute'].astype(str) + "')",
+        showlegend=False
+    ))
+    fig.add_trace(go.Scatter(
+        x=goals_away['minute'], y=goals_away['xgcum'],
+        mode='markers+text',
+        marker=dict(color=away_color, size=18,  line=dict(color='white', width=1.5)),
+        text=goals_away['expectedgoals'].round(2),
+        textfont=dict(color='black', size=9),
+        textposition="middle center",
+        hoverinfo='text',
+        hovertext=goals_away['playername'] + ' (' + goals_away['minute'].astype(str) + "')",
+        showlegend=False
+    ))
+
+
+    # Update layout
+    home_xg_total = df_home['expectedgoals'].sum().round(2)
+    away_xg_total = df_away['expectedgoals'].sum().round(2)
+    home_goals = match_data['homegoals'].iloc[0]
+    away_goals = match_data['awaygoals'].iloc[0]
+    
+    fig.update_layout(
+        title=f"<b>{home_team_name} [{home_xg_total} xG] {home_goals} - {away_goals} {away_team_name} [{away_xg_total} xG]</b>",
+        xaxis_title="Minute", yaxis_title="Cumulative xG",
+        template='plotly_dark',
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        xaxis=dict(range=[0, 95], tickvals=list(range(0, 91, 15))),
+        yaxis=dict(range=[0, max(df_home['xgcum'].max(), df_away['xgcum'].max()) * 1.1]),
+        shapes=[
+            dict(type='line', x0=45, x1=45, y0=0, y1=max(df_home['xgcum'].max(), df_away['xgcum'].max()) * 1.1,
+                 line=dict(color='white', width=1, dash='dash'))
+        ],
+        annotations=[
+            dict(x=22.5, y=max(df_home['xgcum'].max(), df_away['xgcum'].max()) * 1.05, text="First Half", showarrow=False, font=dict(size=14)),
+            dict(x=67.5, y=max(df_home['xgcum'].max(), df_away['xgcum'].max()) * 1.05, text="Second Half", showarrow=False, font=dict(size=14))
+        ]
+    )
+    return fig 
