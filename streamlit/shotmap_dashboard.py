@@ -47,13 +47,16 @@ def run():
         st.sidebar.warning("No players found with that name.")
         st.stop()
         
-    player_filter = st.sidebar.selectbox("Select Player", player_options)
+    # Set default player to Salah, if available
+    default_player = "Mohamed Salah"
+    player_index = player_options.index(default_player) if default_player in player_options else 0
+    player_filter = st.sidebar.selectbox("Select Player", player_options, index=player_index)
     
     player_df = df[df['playername'] == player_filter]
 
     all_event_types = sorted(player_df['eventtype'].dropna().unique())
     # Set 'Goal' as default if available
-    default_events = ['Goal'] if 'Goal' in all_event_types else all_event_types
+    default_events = None#['Goal'] if 'Goal' in all_event_types else all_event_types
     selected_event_types = st.sidebar.multiselect("Event Types", options=all_event_types, default=default_events)
 
     # Determine opponent teams for the selected player
@@ -69,8 +72,18 @@ def run():
         
     opponent_filter = st.sidebar.selectbox("Opponent Team (optional)", ["All"] + opponent_teams)
 
-    seasons = sorted(player_df['seasonname'].dropna().unique())
-    season_filter = st.sidebar.selectbox("Season (optional)", ["All"] + seasons)
+    # Default season to the latest available for the selected player
+    seasons = sorted(player_df['seasonname'].dropna().unique(), reverse=True)
+    latest_season = seasons[0] if seasons else None
+    
+    # The list includes "All", so we add 1 to the index of the latest season
+    season_index = seasons.index(latest_season) + 1 if latest_season else 0
+    
+    season_filter = st.sidebar.selectbox(
+        "Season (optional)", 
+        ["All"] + seasons, 
+        index=0 # Default to "All" to show all seasons initially
+    )
 
     show_heatmap = st.sidebar.checkbox("Show Heatmap", value=True)
 
