@@ -144,6 +144,11 @@ def run():
         st.warning("Selected match not found. Try adjusting filters.")
         st.stop()
 
+   
+
+    st.divider()
+
+
     # --- Match Header ---
     home_team, score, away_team = st.columns([1, 0.5, 1])
     with home_team:
@@ -154,6 +159,40 @@ def run():
     with away_team:
         st.image(match_data['awayteamimageurl'].iloc[0], width=80)
         st.subheader(match_data['awayteamname'].iloc[0])
+
+    
+
+
+     # --- Match Details ---
+    st.divider()
+    col1, col2, col3 = st.columns(3)
+    match_row = match_data.iloc[0]
+
+    with col1:
+        st.caption("Season")
+        st.write(match_row.get('seasonname', "N/A"))
+        st.caption("Stadium")
+        st.write(match_row.get('stadiumname', "N/A"))
+
+    with col2:
+        st.caption("Date")
+        match_time_utc = match_row.get('matchtimeutc')
+        if match_time_utc:
+            date_str = pd.to_datetime(match_time_utc).strftime('%d %b %Y, %H:%M')
+            st.write(f"{date_str} UTC")
+        else:
+            st.write("N/A")
+        
+        st.caption("Attendance")
+        attendance = match_row.get('attendance')
+        attendance_str = f"{int(attendance):,}" if pd.notna(attendance) and attendance > 0 else "N/A"
+        st.write(attendance_str)
+
+    with col3:
+        st.caption("Match Round")
+        st.write(match_row.get('matchround', "N/A"))
+        st.caption("Referee")
+        st.write(match_row.get('refereename', "N/A"))
 
     st.divider()
 
