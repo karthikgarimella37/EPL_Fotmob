@@ -223,11 +223,27 @@ def run():
     with home_team:
         st.image(match_data['hometeamimageurl'].iloc[0], width=80)
         st.subheader(match_data['hometeamname'].iloc[0])
+        if not shotmap_df.empty:
+            home_team_id = match_data['hometeamid'].iloc[0]
+            home_goals = shotmap_df[(shotmap_df['isgoal'] == True) & (shotmap_df['playerteamid'] == home_team_id)]
+            if not home_goals.empty:
+                scorers = home_goals.groupby('lastname')['minute'].apply(lambda x: sorted(list(x))).reset_index()
+                for _, row in scorers.iterrows():
+                    minutes_str = ", ".join([f"{m}'" for m in row['minute']])
+                    st.caption(f"{row['lastname']} {minutes_str}")
     with score:
         st.title(f"{match_data['homegoals'].iloc[0]} - {match_data['awaygoals'].iloc[0]}")
     with away_team:
         st.image(match_data['awayteamimageurl'].iloc[0], width=80)
         st.subheader(match_data['awayteamname'].iloc[0])
+        if not shotmap_df.empty:
+            away_team_id = match_data['awayteamid'].iloc[0]
+            away_goals = shotmap_df[(shotmap_df['isgoal'] == True) & (shotmap_df['playerteamid'] == away_team_id)]
+            if not away_goals.empty:
+                scorers = away_goals.groupby('lastname')['minute'].apply(lambda x: sorted(list(x))).reset_index()
+                for _, row in scorers.iterrows():
+                    minutes_str = ", ".join([f"{m}'" for m in row['minute']])
+                    st.caption(f"{row['lastname']} {minutes_str}")
 
     
 
@@ -433,8 +449,6 @@ def create_xg_race_plot(shotmap_df, match_data):
     # Get goal events for annotations
     goals_home = df_home[df_home['isgoal'] == True]
     goals_away = df_away[df_away['isgoal'] == True]
-
-    st.write(df_home)
 
     # Create figure
     fig = go.Figure()
