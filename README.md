@@ -31,7 +31,7 @@ The project is designed to provide soccer fans and data analysts with a comprehe
 
 The project follows a modern data architecture, with a clear separation of concerns between data extraction, processing, and visualization.
 
-![Architecture Diagram](images/EPL%20Fotmob%20ETL%20Flow.png) 
+![Architecture Diagram](images/EPL%20Fotmob%20ETL%20Flow.jpg) 
 
 <details>
 <summary>Expand for more details</summary>
