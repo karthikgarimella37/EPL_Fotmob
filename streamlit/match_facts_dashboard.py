@@ -4,6 +4,8 @@ import json
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from db_connection import postgres_connection
+from mplsoccer import Pitch
+import numpy as np
 
 @st.cache_data
 def load_match_facts_data():
@@ -11,7 +13,7 @@ def load_match_facts_data():
     try:
         engine = postgres_connection()
         with engine.connect() as conn:
-            query = "SELECT * FROM vw_match_facts;"
+            query = "SELECT * FROM vw_match_facts where matchqaanswer is not null;"
             df = pd.read_sql(query, conn)
         # Convert momentum from string to dict
         df['momentum'] = df['momentum'].apply(lambda x: json.loads(x) if x else None)
@@ -53,7 +55,7 @@ def load_shotmap_data(match_id):
         st.error(f"Database error loading shotmap data: {e}")
         return pd.DataFrame()
 
-def create_momentum_chart(match_data):
+def create_momentum_chart(match_data, shotmap_df):
     """Creates and returns a matplotlib figure for the momentum chart."""
     try:
         momentum_data = match_data['momentum'].iloc[0]
@@ -80,6 +82,10 @@ def create_momentum_chart(match_data):
         ax.fill_between(df_momentum.index, 0, df_momentum['value'], where=df_momentum['value'] < 0, interpolate=True, color=away_color, alpha=0.8)
         
         ax.axhline(0, color='white', linewidth=0.5)
+
+        # Get the y-limits to place goal markers at the top/bottom
+        ymin, ymax = ax.get_ylim()
+        
         ax.set_xticks([0, len(df_momentum) / 2, len(df_momentum)])
         ax.set_xticklabels(["0'", 'HT', 'FT'], color='white', fontsize=12)
         ax.set_yticks([])
@@ -88,6 +94,34 @@ def create_momentum_chart(match_data):
             spine.set_visible(False)
             
         ax.set_title('Momentum', color='white', fontsize=16)
+        
+        # --- Add goal markers ---
+        if not shotmap_df.empty:
+            home_team_id = match_data['hometeamid'].iloc[0]
+            away_team_id = match_data['awayteamid'].iloc[0]
+            
+            goals = shotmap_df[shotmap_df['isgoal'] == True]
+            home_goals = goals[goals['playerteamid'] == home_team_id]
+            away_goals = goals[goals['playerteamid'] == away_team_id]
+            
+            num_points = len(df_momentum)
+            # Assuming momentum data covers ~95 minutes of match time for scaling
+            total_match_minutes = 95.0
+            
+            for _, goal in home_goals.iterrows():
+                goal_minute = goal['minute']
+                x_pos = int(goal_minute * num_points / total_match_minutes)
+                if 0 <= x_pos < num_points:
+                    ax.plot(x_pos, ymax * 0.9, marker='*', color='yellow', markersize=12,
+                            markeredgecolor=home_color, markeredgewidth=1, clip_on=False)
+
+            for _, goal in away_goals.iterrows():
+                goal_minute = goal['minute']
+                x_pos = int(goal_minute * num_points / total_match_minutes)
+                if 0 <= x_pos < num_points:
+                    ax.plot(x_pos, ymin * 0.9, marker='*', color='yellow', markersize=12,
+                            markeredgecolor=away_color, markeredgewidth=1, clip_on=False)
+        
         return fig
     except Exception:
         # If any error occurs, just skip creating the chart
@@ -180,6 +214,7 @@ def run():
 
     match_id = match_data['matchid'].iloc[0]
     player_stats_df = load_player_match_analytics(match_id)
+    shotmap_df = load_shotmap_data(match_id)
 
 
     # --- Match Header ---
@@ -233,7 +268,7 @@ def run():
     # --- Main Content (Momentum & Stats) ---
     col1, col2 = st.columns(2)
     with col1:
-        fig = create_momentum_chart(match_data)
+        fig = create_momentum_chart(match_data, shotmap_df)
         if fig:
             st.pyplot(fig)
         else:
@@ -289,12 +324,19 @@ def run():
 
     # --- xG Race Plot ---
     with st.expander("View xG Race Plot"):
-        shotmap_df = load_shotmap_data(match_id)
         if shotmap_df.empty:
             st.warning("Shotmap data not available for this match.")
         else:
             fig = create_xg_race_plot(shotmap_df, match_data)
             st.plotly_chart(fig, use_container_width=True)
+            
+    # --- Shot Map ---
+    with st.expander("View Shot Map"):
+        if shotmap_df.empty:
+            st.warning("Shotmap data not available for this match.")
+        else:
+            fig = create_shot_map(shotmap_df, match_data)
+            st.pyplot(fig, use_container_width=True)
             
     # --- Advanced Stats ---
     with st.expander("View Advanced Team Stats"):
@@ -438,4 +480,69 @@ def create_xg_race_plot(shotmap_df, match_data):
             dict(x=67.5, y=max(df_home['xgcum'].max(), df_away['xgcum'].max()) * 1.05, text="Second Half", showarrow=False, font=dict(size=14))
         ]
     )
+    return fig 
+
+def create_shot_map(shotmap_df, match_data):
+    """Creates and returns a matplotlib figure for the team shot map."""
+
+    home_team_id = match_data['hometeamid'].iloc[0]
+    away_team_id = match_data['awayteamid'].iloc[0]
+    home_color = match_data['hometeamcolor'].iloc[0] or '#d3151e'
+    away_color = match_data['awayteamcolor'].iloc[0] or '#4a72d4'
+    home_team_name = match_data['hometeamname'].iloc[0]
+    away_team_name = match_data['awayteamname'].iloc[0]
+    
+    df = shotmap_df.copy()
+    df = df.astype({"expectedgoals": float, "xposition": float, "yposition": float, "isgoal": bool})
+
+    pitch = Pitch(pitch_type='uefa', pitch_color='black', line_color='white', line_zorder=2)
+    fig, ax = pitch.draw(figsize=(10, 7))
+    fig.set_facecolor("black")
+    
+    home_shots = df[(df['playerteamid'] == home_team_id) & (df['isgoal'] == False)]
+    home_goals = df[(df['playerteamid'] == home_team_id) & (df['isgoal'] == True)]
+    away_shots = df[(df['playerteamid'] == away_team_id) & (df['isgoal'] == False)]
+    away_goals = df[(df['playerteamid'] == away_team_id) & (df['isgoal'] == True)]
+
+    
+    # Home team (attacking left to right) - plot y, x
+    pitch.scatter(105 - home_shots.xposition, home_shots.yposition, s=home_shots.expectedgoals * 500,
+                  c=home_color, marker='o', ax=ax)
+    pitch.scatter(105 - home_goals.xposition,  home_goals.yposition, s=home_goals.expectedgoals * 500,
+                  c=home_color, ec=away_color, marker='*', ax=ax, linewidth=0.5)
+
+    # Away team (attacking right to left, flip coordinates)
+    pitch.scatter( away_shots.xposition, away_shots.yposition, s=away_shots.expectedgoals * 500,
+                  c=away_color, marker='o', ax=ax)
+    pitch.scatter( away_goals.xposition, away_goals.yposition, s=away_goals.expectedgoals * 500,
+                  c=away_color, ec=home_color, marker='*', ax=ax, linewidth=0.5)
+    
+    
+    ax.set_title('')
+    fig.text(0.5, 0.96, ' vs ', color='white', ha='center', va='center', fontsize=18)
+    fig.text(0.48, 0.96, home_team_name, color=home_color, ha='right', va='center', fontsize=18, weight='bold')
+    fig.text(0.52, 0.96, away_team_name, color=away_color, ha='left', va='center', fontsize=18, weight='bold')
+
+    # xG legend (top)
+    xg_legend_elements = []
+    for xg_val in [0.1, 0.3, 0.5, 0.7, 0.9]:
+        xg_legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', label=f'{xg_val:.1f} xG',
+                               markerfacecolor='grey', markersize=np.sqrt(xg_val * 500), linestyle='None'))
+    
+    xg_legend = ax.legend(handles=xg_legend_elements, loc='upper center', bbox_to_anchor=(0.51, 0.93),
+               frameon=False, shadow=True, ncol=5, facecolor='black', labelcolor='white')
+    plt.setp(xg_legend.get_title())
+    ax.add_artist(xg_legend)
+
+    # Main legend for teams and goal type (bottom)
+    home_marker = plt.Line2D([0], [0], marker='o', color='w', label=home_team_name, 
+                           markerfacecolor=home_color, markersize=10, linestyle='None')
+    away_marker = plt.Line2D([0], [0], marker='o', color='w', label=away_team_name, 
+                           markerfacecolor=away_color, markersize=10, linestyle='None')
+    goal_marker = plt.Line2D([0], [0], marker='*', color='black', label='Goal', 
+                           markerfacecolor='yellow', markersize=15, linestyle='None')
+    
+    ax.legend(handles=[home_marker, away_marker, goal_marker], loc='lower center', bbox_to_anchor=(0.5, -0.05),
+              fancybox=True, shadow=True, ncol=3, facecolor='black', edgecolor='white', labelcolor='white')
+
     return fig 
