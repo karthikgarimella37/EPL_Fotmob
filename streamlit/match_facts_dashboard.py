@@ -354,7 +354,7 @@ def run():
                 with c1:
                     st.metric(label=home_team_name, value=f"{home_val:.2f}" if isinstance(home_val, float) else home_val)
                 with c2:
-                    st.markdown(f"<div style='text-align: center; padding-top: 2.5rem;'>{stat}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align: center; padding-top: 1.5rem;'>{stat}</div>", unsafe_allow_html=True)
                 with c3:
                     st.metric(label=away_team_name, value=f"{away_val:.2f}" if isinstance(away_val, float) else away_val)
 
