@@ -25,13 +25,13 @@ The project is designed to provide soccer fans and data analysts with a comprehe
 - **Automated Data Extraction**: The pipeline automatically extracts data from Fotmob using a Python script.
 - **Cloud-Based Data Processing**: Data is processed in the cloud using a Dataproc cluster on GCP.
 - **Dimensionally Modeled Data Warehouse**: The processed data is stored in a Supabase PostgreSQL database with a dimensional model.
-- **Interactive Dashboards**: The project features interactive dashboards built with Streamlit for visualizing the data.
+- **Interactive Dashboards**: The project features interactive dashboards built with Streamlit for visualizing the data, leveraging SQL views for efficient data retrieval.
 
 ## Architecture
 
 The project follows a modern data architecture, with a clear separation of concerns between data extraction, processing, and visualization.
 
-![Architecture Diagram](images/architecture.png)  <!-- You might want to create and add an architecture diagram here -->
+![Architecture Diagram](images/EPL%20Fotmob%20ETL%20Flow.png) 
 
 <details>
 <summary>Expand for more details</summary>
@@ -84,6 +84,14 @@ cd terraform
 terraform init
 terraform apply
 ```
+
+**Important**: To avoid incurring unnecessary costs, remember to destroy the GCP resources after you are done.
+
+```bash
+terraform destroy
+```
+
+You can leverage the $300 free credits offered by GCP to run this project.
 
 </details>
 
