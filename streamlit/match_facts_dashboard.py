@@ -342,23 +342,25 @@ def run():
             "Expected goals (xG)": (match_data['homeexpectedgoals'].iloc[0], match_data['awayexpectedgoals'].iloc[0]),
             "Total shots": (match_data['homeshots'].iloc[0], match_data['awayshots'].iloc[0])
         }
-        
-        # Use columns for a side-by-side layout on larger screens
-        # This will stack automatically on smaller screens
-        c1, c2, c3 = st.columns([1, 1, 1])
 
-        with c1:
-            st.metric(label=f"{match_data['hometeamname'].iloc[0]}", value=f"{stats['Expected goals (xG)'][0]:.2f}")
-            st.metric(label=f"{match_data['hometeamname'].iloc[0]}", value=f"{stats['Total shots'][0]}")
+        with st.container(border=True):
+            home_team_name = match_data['hometeamname'].iloc[0]
+            away_team_name = match_data['awayteamname'].iloc[0]
 
-        with c2:
-            st.markdown("<div style='text-align: center; font-weight: bold; padding-top: 0.5rem;'>Expected goals (xG)</div>", unsafe_allow_html=True)
-            st.markdown("<div style='text-align: center; font-weight: bold; padding-top: 3.5rem;'>Total shots</div>", unsafe_allow_html=True)
-            
-        with c3:
-            st.metric(label=f"{match_data['awayteamname'].iloc[0]}", value=f"{stats['Expected goals (xG)'][1]:.2f}")
-            st.metric(label=f"{match_data['awayteamname'].iloc[0]}", value=f"{stats['Total shots'][1]}")
+            for i, (stat, values) in enumerate(stats.items()):
+                c1, c2, c3 = st.columns([1, 1.5, 1])
+                home_val, away_val = values
 
+                # Show team names as labels only for the first stat metric
+                home_label = home_team_name if i == 0 else " "
+                away_label = away_team_name if i == 0 else " "
+                
+                with c1:
+                    st.metric(label=home_label, value=f"{home_val:.2f}" if isinstance(home_val, float) else home_val)
+                with c2:
+                    st.markdown(f"<div style='text-align: center; padding-top: 2.5rem;'>{stat}</div>", unsafe_allow_html=True)
+                with c3:
+                    st.metric(label=away_label, value=f"{away_val:.2f}" if isinstance(away_val, float) else away_val)
 
     st.divider()
 
