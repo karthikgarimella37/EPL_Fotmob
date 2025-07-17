@@ -13,3 +13,4 @@ streamlit
 matplotlib
 mplsoccer
 Pillow
+highlight_text 
