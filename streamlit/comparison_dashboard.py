@@ -79,6 +79,21 @@ def calculate_percentiles(df, metric_col, player_value):
 def run():
     """Main function to run the Player Comparison Dashboard."""
     st.header("Player Comparison Dashboard", anchor=False)
+
+    
+
+    # --- Help Section ---
+    with st.expander("How to use this dashboard"):
+        st.markdown("""
+            This dashboard allows you to compare two players based on a wide range of seasonal statistics.
+            
+            **How it works:**
+            1.  **Select a Season:** Choose the season you want to analyze from the dropdown menu.
+            2.  **Choose Metrics:** Select the performance metrics you are interested in. You can compare anything from goals per 90 minutes to total fantasy points.
+            3.  **Select Players:** Pick the two players you want to compare.
+            
+            The pizza chart visualizes how each player ranks against all other players in the league for the selected metrics. A higher percentile rank (closer to the edge) means the player is among the league's best in that category.
+        """)
     
     # Load fonts using the cached function
     fm_rubik = load_fonts()
@@ -203,3 +218,11 @@ def run():
     )
 
     st.pyplot(fig) 
+
+    
+    with st.expander("Credits and Source Code"):
+        st.caption("""
+            This dashboard was created by Karthik Garimella using the [mplsoccer](https://mplsoccer.readthedocs.io/en/latest/gallery/pizza_plots/plot_pizza_comparison.html#sphx-glr-gallery-pizza-plots-plot-pizza-comparison-py) library.
+            The data is sourced from the [EPL Fotmob API](https://www.fotmob.com).
+            The github repository for this project is [here](https://github.com/karthikgarimella37/EPL_Fotmob).
+        """)

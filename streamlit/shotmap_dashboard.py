@@ -33,13 +33,22 @@ def run():
     
     # --- Shot Map Help Section ---
     shot_map_url = "https://theanalyst.com/na/2021/07/what-is-expected-goals-xg/"
-    with st.expander("What does the Shot Map show?"):
+    with st.expander("What does the Shot Map show? and how to use it?"):
         st.markdown(f"""
             A **Shot Map** is a visual representation of every shot taken by the player. 
             Each point corresponds to a shot's location on the pitch. The size of the point represents the 
             [Expected Goals (xG)]({shot_map_url}) value of the shot—the larger the point, the higher the probability of it being a goal. 
             Goals are highlighted with a green circle. Other event types are highlighted with different markers as shown in the legend.
+
+            **How to use it:**
+            1. **Search for a Player:** Type the player's name in the search bar.
+            2.  **Select a Player:** Pick the player you want to analyze.
+            3.  **Select an Event:** (optional) Select the event type (saved, goal, etc.) you want to analyze.
+            4.  **Select an Opponent Team:** (optional) Choose the opponent team you want to analyze.
+            5.  **Select a Season:** (optional) Choose the season you want to analyze from the dropdown menu.
+            6.  **Show Heatmap:** (optional) Show the heatmap of the shots.
         """) 
+
     df = load_shotmap_data()
     if df.empty:
         st.warning("No shotmap data loaded. Please check the database connection and the 'vw_player_shotmap' view.")
@@ -257,3 +266,10 @@ def run():
     # plt.tight_layout()
 
     st.pyplot(fig) 
+
+    with st.expander("Credits and Source Code"):
+        st.caption("""
+            This dashboard was created by Karthik Garimella using the [mplsoccer](https://mplsoccer.readthedocs.io/en/latest/gallery/pitch_plots/plot_scatter.html#sphx-glr-gallery-pitch-plots-plot-scatter-py) library.
+            The data is sourced from the [EPL Fotmob API](https://www.fotmob.com).
+            The github repository for this project is [here](https://github.com/karthikgarimella37/EPL_Fotmob).
+        """)

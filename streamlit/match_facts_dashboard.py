@@ -163,6 +163,19 @@ def run():
     """Main function to run the Match Facts Dashboard."""
     st.header("Match Facts Dashboard", anchor=False)
     
+    # --- Help Section ---
+    with st.expander("How to use this dashboard"):
+        st.markdown("""
+            This dashboard allows you to analyze match facts, shotmaps, xG race plots, and advanced team stats.
+            
+            **How it works:**
+            1.  **Select a Season:** Choose the season you want to analyze from the dropdown menu.
+            2.  **Select a Match Round:** (optional) Choose the match round you want to analyze from the dropdown menu.
+            3.  **Select a Home Team:** (optional) Choose the home team you want to analyze from the dropdown menu.
+            4.  **Select an Away Team:** (optional) Choose the away team you want to analyze from the dropdown menu.
+            5.  **Select a Match:** Choose the match you want to analyze from the dropdown menu.
+        """)
+
     df = load_match_facts_data()
     if df.empty:
         st.warning("No data found. Check connection and 'vw_match_facts' view.")
@@ -176,27 +189,27 @@ def run():
     season_df = df[df['seasonname'] == selected_season].copy()
     
     # Match Round Filter
-    match_rounds = ["All"] + sorted(season_df['matchround'].dropna().unique())
+    match_rounds = ["Any"] + sorted(season_df['matchround'].dropna().unique())
     selected_round = st.sidebar.selectbox("Select Match Round", match_rounds)
     
     # Start with the full season data, then narrow down
     filtered_df = season_df.copy()
-    if selected_round != "All":
+    if selected_round != "Any":
         filtered_df = filtered_df[filtered_df['matchround'] == selected_round]
 
     # Dynamic Home & Away Team Filters
-    home_teams = ["All"] + sorted(filtered_df['hometeamname'].unique())
+    home_teams = ["Any"] + sorted(filtered_df['hometeamname'].unique())
     selected_home_team = st.sidebar.selectbox("Select Home Team", home_teams)
     
     # If a home team is selected, filter the away team options
-    if selected_home_team != "All":
+    if selected_home_team != "Any":
         filtered_df = filtered_df[filtered_df['hometeamname'] == selected_home_team]
 
-    away_teams = ["All"] + sorted(filtered_df['awayteamname'].unique())
+    away_teams = ["Any"] + sorted(filtered_df['awayteamname'].unique())
     selected_away_team = st.sidebar.selectbox("Select Away Team", away_teams)
 
     # If an away team is selected, filter the dataframe further
-    if selected_away_team != "All":
+    if selected_away_team != "Any":
         filtered_df = filtered_df[filtered_df['awayteamname'] == selected_away_team]
 
     # --- Final Match Selection ---
@@ -291,7 +304,10 @@ def run():
             if match_data['momentum'].iloc[0] is not None:
                 match_momentum_url = "https://theanalyst.com/articles/what-is-match-momentum"
                 with st.expander("What does the Momentum chart show?"):
-                    st.markdown(f"*[Match momentum](%s)* measures the swing of the match and which team is creating more threatening situations at certain points in time. It does this by measuring the likelihood of the team in possession scoring within the next 10 seconds." % match_momentum_url)
+                    st.markdown(f"""*[Match momentum](%s)* measures the swing of the match and 
+                                which team is creating more threatening situations at certain points in time. 
+                                It does this by measuring the likelihood of the team in possession scoring within
+                                 the next 10 seconds. The star markers indicate goals scored by the team.""" % match_momentum_url)
         else:
             st.info("Momentum data not available for this match.")
     
@@ -368,7 +384,7 @@ def run():
             # --- Shot Map Help Section ---
             if not shotmap_df.empty:
                 shot_map_url = "https://theanalyst.com/na/2021/07/what-is-expected-goals-xg/"
-                with st.expander("What does the Shot Map show?"):
+                with st.expander("What does the Shot Map show? and how to use it?"):
                     st.markdown(f"""
                         A **Shot Map** is a visual representation of every shot taken during a football match. 
                         Each dot corresponds to a shot's location on the pitch. The size of the dot represents the 
@@ -430,6 +446,14 @@ def run():
                     away_val = away_stats[key].sum()
                     stat_row(label, home_val, away_val, is_float)
                 st.divider() 
+
+
+    with st.expander("Credits and Source Code"):
+        st.caption("""
+            This dashboard was created by Karthik Garimella using the [mplsoccer](https://mplsoccer.readthedocs.io/en/latest/gallery/pitch_plots/plot_scatter.html#sphx-glr-gallery-pitch-plots-plot-scatter-py/) library.
+            The data is sourced from the [EPL Fotmob API](https://www.fotmob.com).
+            The github repository for this project is [here](https://github.com/karthikgarimella37/EPL_Fotmob).
+        """)
 
 def create_xg_race_plot(shotmap_df, match_data):
     """Creates and returns a Plotly figure for the xG race plot."""

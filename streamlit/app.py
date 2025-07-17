@@ -5,7 +5,7 @@ import match_facts_dashboard
 
 # Set the page configuration for the entire app
 st.set_page_config(
-    page_title="EPL Fotmob Analytics",
+    page_title="EPL Dashboard",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -13,12 +13,12 @@ st.set_page_config(
 
 # --- App Navigation ---
 PAGES = {
-    "Shot Map Analysis": shotmap_dashboard,
-    "Player Comparison": comparison_dashboard,
-    "Match Facts": match_facts_dashboard
+    "Shot Map Dashboard": shotmap_dashboard,
+    "Player Comparison Pizza Plots": comparison_dashboard,
+    "Match Facts Dashboard": match_facts_dashboard
 }
 
-st.sidebar.title('Dashboard Navigation')
+st.sidebar.title('Select Dashboard to view')
 selection = st.sidebar.radio("Go to", list(PAGES.keys()))
 page = PAGES[selection]
 
