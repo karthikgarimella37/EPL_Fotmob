@@ -365,6 +365,17 @@ def run():
             fig = create_shot_map(shotmap_df, match_data)
             st.pyplot(fig, use_container_width=True)
             
+            # --- Shot Map Help Section ---
+            if not shotmap_df.empty:
+                shot_map_url = "https://theanalyst.com/na/2021/07/what-is-expected-goals-xg/"
+                with st.expander("What does the Shot Map show?"):
+                    st.markdown(f"""
+                        A **Shot Map** is a visual representation of every shot taken during a football match. 
+                        Each dot corresponds to a shot's location on the pitch. The size of the dot represents the 
+                        [Expected Goals (xG)]({shot_map_url}) value of the shot—the larger the dot, the higher the probability of it being a goal. 
+                        Goals are highlighted with a star.
+                    """)
+
     # --- Advanced Stats ---
     with st.expander("View Advanced Team Stats"):
         if player_stats_df.empty:
