@@ -14,3 +14,4 @@ matplotlib
 mplsoccer
 Pillow
 highlight_text 
+plotly
