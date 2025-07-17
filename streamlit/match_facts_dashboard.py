@@ -189,7 +189,7 @@ def run():
     season_df = df[df['seasonname'] == selected_season].copy()
     
     # Match Round Filter
-    match_rounds = ["Any"] + sorted(season_df['matchround'].dropna().unique())
+    match_rounds = ["Any"] + sorted(season_df['matchround'].dropna().unique().astype(int))
     selected_round = st.sidebar.selectbox("Select Match Round", match_rounds)
     
     # Start with the full season data, then narrow down
@@ -350,17 +350,13 @@ def run():
             for i, (stat, values) in enumerate(stats.items()):
                 c1, c2, c3 = st.columns([1, 1.5, 1])
                 home_val, away_val = values
-
-                # Show team names as labels only for the first stat metric
-                home_label = home_team_name if i == 0 else " "
-                away_label = away_team_name if i == 0 else " "
                 
                 with c1:
-                    st.metric(label=home_label, value=f"{home_val:.2f}" if isinstance(home_val, float) else home_val)
+                    st.metric(label=home_team_name, value=f"{home_val:.2f}" if isinstance(home_val, float) else home_val)
                 with c2:
                     st.markdown(f"<div style='text-align: center; padding-top: 2.5rem;'>{stat}</div>", unsafe_allow_html=True)
                 with c3:
-                    st.metric(label=away_label, value=f"{away_val:.2f}" if isinstance(away_val, float) else away_val)
+                    st.metric(label=away_team_name, value=f"{away_val:.2f}" if isinstance(away_val, float) else away_val)
 
                 if i < len(stats) - 1:
                     st.divider()
