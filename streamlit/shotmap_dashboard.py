@@ -41,7 +41,7 @@ def run():
             Goals are highlighted with a green circle. Other event types are highlighted with different markers as shown in the legend.
 
             **How to use it:**
-            1. **Search for a Player:** Type the player's name in the search bar.
+            1. **Search for a Player:** Type the player's name in the search bar on the top left.
             2.  **Select a Player:** Pick the player you want to analyze.
             3.  **Select an Event:** (optional) Select the event type (saved, goal, etc.) you want to analyze.
             4.  **Select an Opponent Team:** (optional) Choose the opponent team you want to analyze.

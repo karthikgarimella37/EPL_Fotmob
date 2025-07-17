@@ -342,12 +342,23 @@ def run():
             "Expected goals (xG)": (match_data['homeexpectedgoals'].iloc[0], match_data['awayexpectedgoals'].iloc[0]),
             "Total shots": (match_data['homeshots'].iloc[0], match_data['awayshots'].iloc[0])
         }
-        for stat, values in stats.items():
-            c1, c2, c3 = st.columns([1, 1, 1])
-            c1.metric(label="", value=f"{values[0]:.2f}" if isinstance(values[0], float) else values[0])
-            with c2:
-                st.markdown(f"<div style='text-align: left; padding-top: 2rem;'>{stat}</div>", unsafe_allow_html=True)
-            c3.metric(label="", value=f"{values[1]:.2f}" if isinstance(values[1], float) else values[1])
+        
+        # Use columns for a side-by-side layout on larger screens
+        # This will stack automatically on smaller screens
+        c1, c2, c3 = st.columns([1, 1, 1])
+
+        with c1:
+            st.metric(label=f"{match_data['hometeamname'].iloc[0]}", value=f"{stats['Expected goals (xG)'][0]:.2f}")
+            st.metric(label=f"{match_data['hometeamname'].iloc[0]}", value=f"{stats['Total shots'][0]}")
+
+        with c2:
+            st.markdown("<div style='text-align: center; font-weight: bold; padding-top: 0.5rem;'>Expected goals (xG)</div>", unsafe_allow_html=True)
+            st.markdown("<div style='text-align: center; font-weight: bold; padding-top: 3.5rem;'>Total shots</div>", unsafe_allow_html=True)
+            
+        with c3:
+            st.metric(label=f"{match_data['awayteamname'].iloc[0]}", value=f"{stats['Expected goals (xG)'][1]:.2f}")
+            st.metric(label=f"{match_data['awayteamname'].iloc[0]}", value=f"{stats['Total shots'][1]}")
+
 
     st.divider()
 
