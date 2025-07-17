@@ -271,6 +271,11 @@ def run():
         fig = create_momentum_chart(match_data, shotmap_df)
         if fig:
             st.pyplot(fig)
+            # --- Momentum Help Section ---
+            if match_data['momentum'].iloc[0] is not None:
+                match_momentum_url = "https://theanalyst.com/articles/what-is-match-momentum"
+                with st.expander("What does the Momentum chart show?"):
+                    st.markdown(f"*[Match momentum](%s)* measures the swing of the match and which team is creating more threatening situations at certain points in time. It does this by measuring the likelihood of the team in possession scoring within the next 10 seconds." % match_momentum_url)
         else:
             st.info("Momentum data not available for this match.")
     
@@ -330,6 +335,12 @@ def run():
             fig = create_xg_race_plot(shotmap_df, match_data)
             st.plotly_chart(fig, use_container_width=True)
             
+            # --- xG Race Plot Help Section ---
+            if not shotmap_df.empty:
+                xg_race_url = "https://theanalyst.com/na/2021/07/what-is-expected-goals-xg/"
+                with st.expander("What does the xG Race Plot show?"):
+                    st.markdown(f"An **xG Race Plot** shows the cumulative total of *[Expected Goals (xG)]({xg_race_url})* for each team as the match progresses. It helps visualize which team created more high-quality scoring chances and illustrates the flow of the game in terms of attacking threat.")
+
     # --- Shot Map ---
     with st.expander("View Shot Map"):
         if shotmap_df.empty:
@@ -407,8 +418,13 @@ def create_xg_race_plot(shotmap_df, match_data):
     df = df.astype({"expectedgoals": float, "minute": int})
 
     # Separate home and away shots
-    df_home = df[df['playerteamid'] == home_team_id].sort_values('minute')
-    df_away = df[df['playerteamid'] == away_team_id].sort_values('minute')
+    df_home_shots = df[df['playerteamid'] == home_team_id]
+    df_away_shots = df[df['playerteamid'] == away_team_id]
+
+    # Add a starting point at minute 0 with 0 xG for both teams
+    start_row = pd.DataFrame([{'minute': 0, 'expectedgoals': 0.0}])
+    df_home = pd.concat([start_row, df_home_shots]).sort_values('minute').reset_index(drop=True)
+    df_away = pd.concat([start_row, df_away_shots]).sort_values('minute').reset_index(drop=True)
 
     # Calculate cumulative xG
     df_home['xgcum'] = df_home['expectedgoals'].cumsum()
@@ -417,6 +433,8 @@ def create_xg_race_plot(shotmap_df, match_data):
     # Get goal events for annotations
     goals_home = df_home[df_home['isgoal'] == True]
     goals_away = df_away[df_away['isgoal'] == True]
+
+    st.write(df_home)
 
     # Create figure
     fig = go.Figure()
