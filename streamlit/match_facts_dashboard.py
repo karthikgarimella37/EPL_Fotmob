@@ -362,6 +362,9 @@ def run():
                 with c3:
                     st.metric(label=away_label, value=f"{away_val:.2f}" if isinstance(away_val, float) else away_val)
 
+                if i < len(stats) - 1:
+                    st.divider()
+
     st.divider()
 
     # --- Lineups ---
