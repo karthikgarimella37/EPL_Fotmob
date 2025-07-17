@@ -4,39 +4,47 @@ from dotenv import load_dotenv
 from urllib.parse import quote
 from sqlalchemy import create_engine
 
-# Define the default path for the .env file relative to this script
-DEFAULT_ENV_PATH = os.path.join(os.path.dirname(__file__), '../.env')
+# Load environment variables from .env file for local development
+DEFAULT_ENV_PATH = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(dotenv_path=DEFAULT_ENV_PATH)
 
-def postgres_credentials(file_path=DEFAULT_ENV_PATH):
-    """Loads database credentials from an environment file."""
-    load_dotenv(file_path)
-    username = quote(st.secrets["connections"]["postgresql"]["username"])
-    password = st.secrets["connections"]["postgresql"]["password"]
-
-    host = st.secrets["connections"]["postgresql"]['host']
-    port = st.secrets["connections"]["postgresql"]['port']
-    database = st.secrets["connections"]["postgresql"]['database']
-
-# SQL engine creation
-    connection_string = f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{database}'
+def get_db_credentials():
+    """
+    Retrieves database credentials.
+    - On Streamlit Cloud, it uses st.secrets.
+    - Locally, it uses environment variables from a .env file.
+    """
+    # Deployed on Streamlit Cloud
+    if hasattr(st, 'secrets') and "connections" in st.secrets and "postgresql" in st.secrets["connections"]:
+        return st.secrets["connections"]["postgresql"]
     
-    return username, password, host, port, database
+    # Local development
+    return {
+        "username": os.getenv("POSTGRES_USER"),
+        "password": os.getenv("POSTGRES_PASSWORD"),
+        "host": os.getenv("POSTGRES_HOST"),
+        "port": os.getenv("POSTGRES_PORT"),
+        "database": os.getenv("POSTGRES_DB"),
+    }
 
-def postgres_connection(file_path=DEFAULT_ENV_PATH):
+def postgres_connection():
     """Establishes a connection to the PostgreSQL database."""
-    sql_username, sql_password, sql_host, sql_port, sql_database = postgres_credentials(file_path)
+    creds = get_db_credentials()
 
-    if not all([sql_username, sql_password, sql_host, sql_port, sql_database]):
+    if not all(creds.values()):
         st.error("One or more database environment variables are missing.")
-        st.info(f"Check .env file in the 'streamlit' directory.")
+        st.info("For local development, check your .env file. For deployment, check your Streamlit Cloud secrets.")
         st.stop()
         
-    connection_string = f'postgresql+psycopg2://{sql_username}:{sql_password}@{sql_host}:{sql_port}/{sql_database}'
+    connection_string = (
+        f'postgresql+psycopg2://{quote(creds["username"])}:{quote(creds["password"])}@'
+        f'{creds["host"]}:{creds["port"]}/{creds["database"]}'
+    )
     
     try:
         engine = create_engine(connection_string, future=True, pool_pre_ping=True)
         # Test the connection
-        with engine.connect() as conn:
+        with engine.connect():
             pass
         return engine
     except Exception as e:
