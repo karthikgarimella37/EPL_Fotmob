@@ -1,21 +1,26 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
+from urllib.parse import quote
 from sqlalchemy import create_engine
 
 # Define the default path for the .env file relative to this script
-DEFAULT_ENV_PATH = os.path.join(os.path.dirname(__file__), '.env')
+DEFAULT_ENV_PATH = os.path.join(os.path.dirname(__file__), '../.env')
 
 def postgres_credentials(file_path=DEFAULT_ENV_PATH):
     """Loads database credentials from an environment file."""
     load_dotenv(file_path)
-    sql_username = os.getenv("SQL_USERNAME")
-    sql_password = os.getenv("SQL_PASSWORD")
-    sql_host = os.getenv("SQL_HOST")
-    sql_port = os.getenv("SQL_PORT")
-    sql_database = os.getenv("SQL_DATABASE")
+    username = quote(st.secrets["connections"]["postgresql"]["username"])
+    password = st.secrets["connections"]["postgresql"]["password"]
+
+    host = st.secrets["connections"]["postgresql"]['host']
+    port = st.secrets["connections"]["postgresql"]['port']
+    database = st.secrets["connections"]["postgresql"]['database']
+
+# SQL engine creation
+    connection_string = f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{database}'
     
-    return sql_username, sql_password, sql_host, sql_port, sql_database
+    return username, password, host, port, database
 
 def postgres_connection(file_path=DEFAULT_ENV_PATH):
     """Establishes a connection to the PostgreSQL database."""
