@@ -6,6 +6,9 @@ import plotly.graph_objects as go
 from db_connection import postgres_connection
 from mplsoccer import Pitch
 import numpy as np
+import urllib.request
+import io
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 @st.cache_data
 def load_match_facts_data():
@@ -60,7 +63,8 @@ def create_momentum_chart(match_data, shotmap_df):
     try:
         momentum_data = match_data['momentum'].iloc[0]
         # Check for empty or malformed data
-        if not momentum_data or 'main' not in momentum_data or 'data' not in momentum_data['main'] or not momentum_data['main']['data']:
+        if not momentum_data or 'main' not in momentum_data or 'data' not in momentum_data['main'] \
+            or not momentum_data['main']['data']:
             return None
 
         # Create the DataFrame from the correct path
@@ -78,8 +82,10 @@ def create_momentum_chart(match_data, shotmap_df):
         fig.set_facecolor('#121212')
         ax.set_facecolor('#121212')
 
-        ax.fill_between(df_momentum.index, 0, df_momentum['value'], where=df_momentum['value'] >= 0, interpolate=True, color=home_color, alpha=0.8)
-        ax.fill_between(df_momentum.index, 0, df_momentum['value'], where=df_momentum['value'] < 0, interpolate=True, color=away_color, alpha=0.8)
+        ax.fill_between(df_momentum.index, 0, df_momentum['value'], where=df_momentum['value'] >= 0,
+                         interpolate=True, color=home_color, alpha=0.8)
+        ax.fill_between(df_momentum.index, 0, df_momentum['value'], where=df_momentum['value'] < 0,
+                         interpolate=True, color=away_color, alpha=0.8)
         
         ax.axhline(0, color='white', linewidth=0.5)
 
@@ -137,27 +143,86 @@ def get_contrasting_text_color(hex_color):
     luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
     return '#000000' if luminance > 0.5 else '#FFFFFF'
 
-def display_lineup(lineup_data, team_name):
-    """Displays the starting lineup for a team."""
-    st.subheader(f"{team_name} Starters")
+def display_formations(home_lineup, away_lineup, home_team_name, away_team_name, home_color, away_color):
+    """Displays the starting lineups for both teams on a single soccer pitch."""
+    
+    home_starters = [p for p in home_lineup if p.get('IsStarter')] if home_lineup else []
+    away_starters = [p for p in away_lineup if p.get('IsStarter')] if away_lineup else []
 
-    # Data is already parsed from JSON by the DB driver
-    if not lineup_data or not isinstance(lineup_data, list):
+    if not home_starters and not away_starters:
         st.write("Lineup data not available.")
         return
 
-    starters = [p for p in lineup_data if p.get('IsStarter')]
+    # --- Position ID to Pitch Coordinates Mapping ---
+    # the home team is entirely on the left and the away team is on the right (basically a mirror image based on pitch dimensions).
+    position_map = {
+        # Goalkeepers
+        11: (5, 35),
+        # Defenders
+        31: (20, 35), 
+        32: (20, 60), 38: (20, 10), 33: (20, 50), 34: (20, 45),
+        35: (20, 35), 36: (20, 25), 37: (20, 20), 39: (20, 5), 
+        
+        # Midfielders
+        51: (40, 45), 52: (35, 10), 55: (40, 25), 58: (35, 65), 59: (40, 5), # Central/Defensive Mids
+        62: (35, 10), 63: (45, 5), 64: (30, 45), 65: (30, 35), 
+        66: (30, 30), 67: (45, 20), 68: (35, 60), 
+        
+        # Attacking Midfielders / Wingers
+        71: (35, 5), 72: (35, 10), 73: (35, 15), 74: (35, 25), 75: (35, 35), # Attacking Mids
+        76: (35, 45), 77: (35, 50), 78: (35, 60), 79: (35, 65), # Wingers
+        81: (55, 40), 82: (45, 10),  83: (40, 50), 84: (40, 50),
+        85: (40, 35), 86: (40, 25), 87: (40, 15), 88: (45, 60), 89: (55, 40),
 
-    if not starters:
-        st.write("No starters listed.")
-        return
+        # Forwards / Strikers
+        92: (45, 50), 94: (45, 30), 95: (45, 40), 96: (45, 45), 98: (45, 35),
+        100: (45, 40), 103: (45, 15), 104: (45, 25), 105: (45, 35), 106: (45, 45),
+        107: (45, 55), 114: (50, 40), 115: (50, 35), 116: (50, 40)
+    }
 
-    cols = st.columns(4)
-    for i, player in enumerate(starters):
-        with cols[i % 4]:
-            # Use .get() for safer dictionary access
-            st.image(player.get('PlayerImageUrl', ''), width=60)
-            st.caption(player.get('PlayerName', 'N/A'))
+    pitch = Pitch(pitch_type='uefa', pitch_color='#121212', line_color='white', line_zorder=2)
+    fig, ax = pitch.draw(figsize=(10, 7))
+    fig.set_facecolor("#121212")
+
+    def plot_player(player, x, y, color):
+        """Plots a player image or a fallback scatter point."""
+        try:
+            image_url = player.get('PlayerImageUrl')
+            if not image_url: raise ValueError("No image URL")
+            
+            with urllib.request.urlopen(image_url) as url:
+                img_data = io.BytesIO(url.read())
+            img = plt.imread(img_data, format='png')
+
+            imagebox = OffsetImage(img, zoom=0.1)
+            ab = AnnotationBbox(imagebox, (x, y), frameon=False, pad=0)
+            ax.add_artist(ab)
+            
+            pitch.annotate(player.get('PlayerName', 'N/A').split()[-1], (x, y - 2.5), 
+                           va='top', ha='center', color='white', fontsize=8, ax=ax)
+        except Exception:
+            pitch.scatter(x, y, s=400, c=color, ec='white', ax=ax, zorder=3)
+            pitch.annotate(player.get('PlayerName', 'N/A').split()[-1], (x, y), 
+                           va='center', ha='center', color=get_contrasting_text_color(color), fontsize=8, ax=ax)
+
+    # Plot Home Team
+    for i, player in enumerate(home_starters):
+        pos_id_raw = player.get('PositionID')
+        pos_id = int(pos_id_raw) if pos_id_raw is not None else None
+        x, y = position_map.get(pos_id, (5, 5 + i * 4))
+        plot_player(player, x, y, home_color)
+
+    # Plot Away Team
+    for i, player in enumerate(away_starters):
+        pos_id_raw = player.get('PositionID')
+        pos_id = int(pos_id_raw) if pos_id_raw is not None else None
+        x_home, y_home = position_map.get(pos_id, (5, 5 + i * 4))
+        x_away, y_away = 105 - x_home, 70 - y_home
+        plot_player(player, x_away, y_away, away_color)
+
+    ax.set_title(f"{home_team_name} vs {away_team_name} Formation", color='white', 
+                 va='center', ha='center', fontsize=16)
+    st.pyplot(fig, use_container_width=True)
 
 def run():
     """Main function to run the Match Facts Dashboard."""
@@ -188,8 +253,12 @@ def run():
     
     season_df = df[df['seasonname'] == selected_season].copy()
     
+    # Convert 'matchround' to a nullable integer type to handle potential missing values
+    # while allowing for proper sorting and filtering.
+    season_df['matchround'] = season_df['matchround'].astype(pd.Int64Dtype())
+    
     # Match Round Filter
-    match_rounds = ["Any"] + sorted(season_df['matchround'].dropna().unique().astype(int))
+    match_rounds = ["Any"] + sorted(season_df['matchround'].dropna().unique())
     selected_round = st.sidebar.selectbox("Select Match Round", match_rounds)
     
     # Start with the full season data, then narrow down
@@ -365,11 +434,19 @@ def run():
 
     # --- Lineups ---
     with st.expander("Show Starting Lineups"):
-        col1, col2 = st.columns(2)
-        with col1:
-            display_lineup(match_data['homelineup'].iloc[0], match_data['hometeamname'].iloc[0])
-        with col2:
-            display_lineup(match_data['awaylineup'].iloc[0], match_data['awayteamname'].iloc[0])
+        home_team_name = match_data['hometeamname'].iloc[0]
+        away_team_name = match_data['awayteamname'].iloc[0]
+        home_color = match_data['hometeamcolor'].iloc[0] or '#d3151e'
+        away_color = match_data['awayteamcolor'].iloc[0] or '#4a72d4'
+
+        display_formations(
+            home_lineup=match_data['homelineup'].iloc[0],
+            away_lineup=match_data['awaylineup'].iloc[0],
+            home_team_name=home_team_name,
+            away_team_name=away_team_name,
+            home_color=home_color,
+            away_color=away_color
+        )
 
     # --- xG Race Plot ---
     with st.expander("View xG Race Plot"):
@@ -547,7 +624,7 @@ def create_xg_race_plot(shotmap_df, match_data):
         title=f"<b>{home_team_name} [{home_xg_total} xG] {home_goals} - {away_goals} {away_team_name} [{away_xg_total} xG]</b>",
         xaxis_title="Minute", yaxis_title="Cumulative xG",
         template='plotly_dark',
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        legend=dict(yanchor="top", y=0.9, xanchor="left", x=0.01),
         xaxis=dict(range=[0, 95], tickvals=list(range(0, 91, 15))),
         yaxis=dict(range=[0, max(df_home['xgcum'].max(), df_away['xgcum'].max()) * 1.1]),
         shapes=[
@@ -555,8 +632,10 @@ def create_xg_race_plot(shotmap_df, match_data):
                  line=dict(color='white', width=1, dash='dash'))
         ],
         annotations=[
-            dict(x=22.5, y=max(df_home['xgcum'].max(), df_away['xgcum'].max()) * 1.05, text="First Half", showarrow=False, font=dict(size=14)),
-            dict(x=67.5, y=max(df_home['xgcum'].max(), df_away['xgcum'].max()) * 1.05, text="Second Half", showarrow=False, font=dict(size=14))
+            dict(x=22.5, y=max(df_home['xgcum'].max(), df_away['xgcum'].max()) * 1.05, 
+                 text="First Half", showarrow=False, font=dict(size=14)),
+            dict(x=67.5, y=max(df_home['xgcum'].max(), df_away['xgcum'].max()) * 1.05, 
+                 text="Second Half", showarrow=False, font=dict(size=14))
         ]
     )
     return fig 

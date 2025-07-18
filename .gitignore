@@ -237,3 +237,4 @@ terraform/C*Userskarth.sshepl_fotmob
 terraform/C*Userskarth.sshepl_fotmob.pub
 airflow/dags/postgresql-42.6.0.jar
 streamlit/secrets.toml
+streamlit/db_connection.py
