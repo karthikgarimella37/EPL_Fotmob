@@ -2,6 +2,7 @@ import streamlit as st
 import shotmap_dashboard
 import comparison_dashboard
 import match_facts_dashboard
+import home
 
 # Set the page configuration for the entire app
 st.set_page_config(
@@ -13,13 +14,14 @@ st.set_page_config(
 
 # --- App Navigation ---
 PAGES = {
+    "Home": home,
     "Shot Map Dashboard": shotmap_dashboard,
     "Player Comparison Pizza Plots": comparison_dashboard,
     "Match Facts Dashboard": match_facts_dashboard
 }
 
 st.sidebar.title('Select Dashboard to view')
-selection = st.sidebar.radio("Go to", list(PAGES.keys()))
+selection = st.sidebar.radio("Go to", list(PAGES.keys()), index=0)
 page = PAGES[selection]
 
 def main():
