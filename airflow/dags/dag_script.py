@@ -81,7 +81,9 @@ pyspark_job = {
         "placement": {"cluster_name": "etl-cluster"},
         "pyspark_job": {
             "main_python_file_uri": "gs://terraform-fotmob-terra-bucket-kg/load_to_staging.py",
-            "python_file_uris": ["gs://terraform-fotmob-terra-bucket-kg/deps.zip"],
+            "python_file_uris": ["gs://terraform-fotmob-terra-bucket-kg/deps.zip",
+                                 "gs://terraform-fotmob-terra-bucket-kg/data_loading_functions.py"
+            ],
             "file_uris": ["gs://terraform-fotmob-terra-bucket-kg/.env"],
             "jar_file_uris": ["gs://terraform-fotmob-terra-bucket-kg/postgresql-42.6.0.jar"],
             "properties": {

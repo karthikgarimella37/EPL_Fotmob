@@ -88,7 +88,7 @@ def postgres_connection(file_path):
 
     return engine
 
-def check_existing_matches(engine):
+def check_current_year_vs_(engine):
     '''
     Check if all matches exist in dim_match. If not, get the latest match inserted
     '''
@@ -103,35 +103,52 @@ def check_existing_matches(engine):
             return last_match
         
 
-def fetch_all_season_matches(session, start_year=2014, end_year= datetime.now().year + 1):
+def fetch_all_season_matches(session):
     '''
     Fetch all EPL matches from the given range of seasons using the provided session
     '''
     all_matches = []
-    for year in range(start_year, end_year):\
+    
     # header has to be modularized or needs to be changed for each new run (once header key expires, I guess)
-        headers = {
-    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9tYXRjaERldGFpbHM/bWF0Y2hJZD0xOTg3MDc5IiwiY29kZSI6MTc1MTg0Mzg3Njc4NiwiZm9vIjoicHJvZHVjdGlvbjowMGY3ZjViY2RmZDgzYjZmNmFiMWVkODQxM2YzZTlkMjcxZmE3NDRmLXVuZGVmaW5lZCJ9LCJzaWduYXR1cmUiOiJEMkVFRDAyQzg5MEFBMDU4QUI5QjZGNDNBRjNGMDM4MyJ9"
-                    }
-        url = f"https://www.fotmob.com/api/fixtures?id=47&season={year}%2F{year+1}"
-        try:
-            response = session.get(url, headers=headers, timeout=30) # Added timeout
-            print(f"Request to {url} returned status code {response.status_code}")
-            response.raise_for_status() # Raise an exception for bad status codes
-            matches_data = response.json()
-            # print("Raw response: ", response.text) # Be careful with printing large responses
-            # print("Matches: ", matches_data)
-            if isinstance(matches_data, list): # Ensure matches_data is a list
-                for match in matches_data:
-                    if isinstance(match, dict) and 'id' in match: # Ensure match is a dict and has 'id'
-                        all_matches.append(match['id'])
-                    else:
-                        print(f"Skipping invalid match data: {match}")
-            else:
-                print(f"Unexpected data format for matches: {matches_data}")
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching season matches for {year}-{year+1}: {e}")
-            continue # Continue to next year if an error occurs
+    headers = {
+"X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9maXh0dXJlcz9pZD0xMTEmc2Vhc29uPTIwMjElMkYyMDIyIiwiY29kZSI6MTc1MzMzODEyMzExOSwiZm9vIjoicHJvZHVjdGlvbjplNTkwMTg4ZTVjZWZkMTkyN2Y1OTcxNzAwYzVlODE3NWRiNzI5Mjg1LXVuZGVmaW5lZCJ9LCJzaWduYXR1cmUiOiIzMjVFRjdCRUMwODRDMEQ5MUFENTMzNEIxQ0NFNjMzRSJ9"
+                }
+    # Read all league ids from the file
+    league_ids = []
+    with open('all_league_ids.txt', 'r') as file:
+        for line in file:
+            league_ids.append(line.strip())
+    for league_id in league_ids:                
+        league_url = f"https://www.fotmob.com/api/data/leagues?id={league_id}"
+        league_response = session.get(league_url, headers=headers, timeout=30)
+        json_response = league_response.json()
+        if league_response.status_code == 200 and json_response is not None and \
+        json_response['allAvailableSeasons']:
+            print(f"League found for league {league_id}: {json_response['details']['name']}")
+        else:
+            print(f"League not found for league {league_id}")
+            continue
+        for season in json_response['allAvailableSeasons']:
+            url = f"https://www.fotmob.com/api/fixtures?id={league_id}&season={season}"
+            try:
+                season_response = session.get(url, headers=headers, timeout=30) # Added timeout
+                print(f"Request to {url} returned status code {season_response.status_code}")
+                season_response.raise_for_status() # Raise an exception for bad status codes
+                matches_data = season_response.json()
+                # print("Raw response: ", response.text) # Large responses
+                # print("Matches: ", matches_data)
+                if isinstance(matches_data, list): # Ensure matches_data is a list
+                    for match in matches_data:
+                        if isinstance(match, dict) and 'id' in match: # Ensure match is a dict and has 'id'
+                            all_matches.append(match['id'])
+                        else:
+                            print(f"Skipping invalid match data: {match}")
+                else:
+                    print(f"Unexpected data format for matches: {matches_data}")
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching season matches: {e}")
+                continue # Continue to next year if an error occurs
+        print(f"All Matches for {league_id} fetched; {len(all_matches)} matches found")
     print(f"fetch_all_season_matches function done, found {len(all_matches)} matches.")
     return all_matches
 
@@ -140,7 +157,7 @@ def fetch_match_details(session, match_id):
     Fetch details of a given match using the provided session
     '''
     headers = {
-    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9tYXRjaERldGFpbHM/bWF0Y2hJZD0xOTg3MDc5IiwiY29kZSI6MTc1MTg0Mzg3Njc4NiwiZm9vIjoicHJvZHVjdGlvbjowMGY3ZjViY2RmZDgzYjZmNmFiMWVkODQxM2YzZTlkMjcxZmE3NDRmLXVuZGVmaW5lZCJ9LCJzaWduYXR1cmUiOiJEMkVFRDAyQzg5MEFBMDU4QUI5QjZGNDNBRjNGMDM4MyJ9"
+    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9maXh0dXJlcz9pZD0xMTEmc2Vhc29uPTIwMjElMkYyMDIyIiwiY29kZSI6MTc1MzMzODEyMzExOSwiZm9vIjoicHJvZHVjdGlvbjplNTkwMTg4ZTVjZWZkMTkyN2Y1OTcxNzAwYzVlODE3NWRiNzI5Mjg1LXVuZGVmaW5lZCJ9LCJzaWduYXR1cmUiOiIzMjVFRjdCRUMwODRDMEQ5MUFENTMzNEIxQ0NFNjMzRSJ9"
                     }
     url = f"https://www.fotmob.com/api/matchDetails?matchId={match_id}"
     try:
@@ -199,7 +216,7 @@ def main():
     engine = postgres_connection(file_path)
 
     # Check existing data
-    last_match_id = check_existing_matches(engine)
+    last_match_id = None #check_existing_matches(engine)
 
     # Fetch matches
     all_matches = fetch_all_season_matches(fotmob_session) if last_match_id is None else [last_match_id + 1]
