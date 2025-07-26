@@ -44,7 +44,7 @@ resource "google_dataproc_cluster" "etl-cluster" {
     }
 
     worker_config {
-      num_instances = 0
+      num_instances = 2
       machine_type  = "n1-standard-2"
     }
 

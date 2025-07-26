@@ -52,7 +52,7 @@ def postgres_credentials(file_path):
     '''
     
     '''
-    load_env(file_path)
+    load_dotenv(dotenv_path=file_path)
     sql_username = os.getenv("sql_username")
     sql_password = os.getenv("sql_password")
     sql_host = os.getenv("sql_host")
@@ -361,7 +361,10 @@ def custom_schema():
             StructField("matchFacts", StructType([
                 StructField("matchId", LongType(), True),
                 StructField("highlights", StringType(), True), # Null in data
-                StructField("playerOfTheMatch", StructType([]), True), # Empty object in data
+                StructField("playerOfTheMatch", StructType([
+                    StructField("id", LongType(), True),
+                    StructField("name", StringType(), True)
+                ]), True), # Empty object in data
                 StructField("matchesInRound", ArrayType(
                     StructType([
                         StructField("id", StringType(), True),
@@ -903,13 +906,18 @@ def load_to_staging(spark_session, gcs_path, schema, postgres_args):
 
 def main():
     # args = parse_arguments()
-
+    print("CWD:", os.getcwd())
+    print("Files in CWD:", os.listdir('.'))
+    with open('.env', 'r') as f:
+        print("Contents of .env:")
+        print(f.read())
     spark = create_spark_session()
-    env_file_path = os.path.join(os.path.dirname(__file__), '../.env')
+    env_file_path = os.path.join(os.getcwd(), '.env')
     # env_file_path = ".env"
+    load_dotenv(dotenv_path=env_file_path)
     sql_username, sql_password, sql_host, sql_port, sql_database = postgres_credentials(env_file_path)
     
-    load_dotenv(dotenv_path=env_file_path)
+    
     gcs_path = "gs://terraform-fotmob-terra-bucket-kg/"
 
     try:

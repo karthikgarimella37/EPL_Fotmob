@@ -1,11 +1,13 @@
-from pyspark.sql.functions import col, concat, lit, lower, regexp_replace, when, explode, row_number, to_timestamp, first, coalesce
+from pyspark.sql.functions import col, concat, lit, lower, regexp_replace, when, explode, row_number, to_timestamp, first, coalesce, size
 from pyspark.sql import Window
-from pyspark.sql.types import StructType, LongType
+from pyspark.sql.types import StructType, LongType, DataType, ArrayType
+from pyspark.sql import functions as F
 import logging
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
 
 
 def write_to_postgres(df, table_name, postgres_args):
@@ -160,28 +162,66 @@ def dim_match_stg(postgres_args, raw_df):
     Loading match_dim_stg Table
     '''
     select_exprs = [
-        col("content.matchFacts.matchId").alias("MatchID"),
-        concat(col("general.homeTeam.name"), lit(" vs "), col("general.awayTeam.name")).alias("MatchName"),
-        to_timestamp(col("content.matchFacts.infoBox").getField("Match Date").getField("utcTime")).alias("MatchTimeUTC"),
-        col("content.matchFacts.infoBox.Tournament.round").alias("MatchRound"),
+        coalesce(
+            col("content.matchFacts.matchId"),
+            col("general.matchId")
+        ).alias("MatchID"),
+        when(
+            col("general.homeTeam.name").isNotNull() & col("general.awayTeam.name").isNotNull(),
+            concat(col("general.homeTeam.name"), lit(" vs "), col("general.awayTeam.name"))
+        ).otherwise(lit(None)).alias("MatchName"),
+        when(
+            col("content.matchFacts.infoBox").isNotNull() & col("content.matchFacts.infoBox").getField("Match Date").isNotNull(),
+            to_timestamp(col("content.matchFacts.infoBox").getField("Match Date").getField("utcTime"))
+        ).otherwise(lit(None)).alias("MatchTimeUTC"),
+        when(
+            col("content.matchFacts.infoBox.Tournament").isNotNull(),
+            col("content.matchFacts.infoBox.Tournament.round")
+        ).otherwise(lit(None)).alias("MatchRound"),
         col("general.leagueId").alias("LeagueID"),
-        col("general.homeTeam.id").alias("HomeTeamID"),
-        col("general.awayTeam.id").alias("AwayTeamID"),
+        when(col("general.homeTeam").isNotNull(), col("general.homeTeam.id")).otherwise(lit(None)).alias("HomeTeamID"),
+        when(col("general.awayTeam").isNotNull(), col("general.awayTeam.id")).otherwise(lit(None)).alias("AwayTeamID"),
         lit(None).cast("string").alias("SeasonName"),
-        col("content.matchFacts.infoBox.Stadium.name").alias("StadiumName"),
-        col("content.matchFacts.infoBox.Attendance").cast("int").alias("Attendance"),
-        col("content.matchFacts.infoBox.Referee.text").alias("RefereeName"),
-        col("content.matchFacts.infoBox.Stadium.lat").alias("MatchLatitude"),
-        col("content.matchFacts.infoBox.Stadium.long").alias("MatchLongitude"),
+        when(
+            col("content.matchFacts.infoBox.Stadium").isNotNull(),
+            col("content.matchFacts.infoBox.Stadium.name")
+        ).otherwise(lit(None)).alias("StadiumName"),
+        when(
+            col("content.matchFacts.infoBox.Attendance").isNotNull(),
+            col("content.matchFacts.infoBox.Attendance").cast("int")
+        ).otherwise(lit(None)).alias("Attendance"),
+        when(
+            col("content.matchFacts.infoBox.Referee").isNotNull(),
+            col("content.matchFacts.infoBox.Referee.text")
+        ).otherwise(lit(None)).alias("RefereeName"),
+        when(
+            col("content.matchFacts.infoBox.Stadium").isNotNull(),
+            col("content.matchFacts.infoBox.Stadium.lat")
+        ).otherwise(lit(None)).alias("MatchLatitude"),
+        when(
+            col("content.matchFacts.infoBox.Stadium").isNotNull(),
+            col("content.matchFacts.infoBox.Stadium.long")
+        ).otherwise(lit(None)).alias("MatchLongitude"),
         col("content.matchFacts.highlights").alias("MatchHighlightsUrl"),
         col("content.matchFacts.countryCode").alias("MatchCountryCode"),
-        col("content.matchFacts.playerOfTheMatch.id").alias("PlayerOfTheMatchID"),
+        when(
+            col("content.matchFacts.playerOfTheMatch.id").isNotNull(),
+            col("content.matchFacts.playerOfTheMatch.id")
+        ).otherwise(lit(None)).alias("PlayerOfTheMatchID"),
         col("content.momentum").alias("Momentum"),
         # Handle QAData separately due to array access
-        col("content.matchFacts.QAData").getItem(0).getField("question").alias("MatchQAQuestion"),
-        col("content.matchFacts.QAData").getItem(0).getField("answer").alias("MatchQAAnswer")
+        when(
+            size(col("content.matchFacts.QAData")) > 0,
+            col("content.matchFacts.QAData").getItem(0).getField("question")
+        ).otherwise(lit(None)).alias("MatchQAQuestion"),
+        when(
+            size(col("content.matchFacts.QAData")) > 0,
+            col("content.matchFacts.QAData").getItem(0).getField("answer")
+        ).otherwise(lit(None)).alias("MatchQAAnswer")
     ]
-
+    print(raw_df.show(20))
+    print(raw_df.count())
+    print(raw_df.select("content.matchFacts.playerOfTheMatch").show(20))
     match_facts_df = raw_df.select(select_exprs).dropDuplicates(["MatchID"])
 
     print(match_facts_df.count())
