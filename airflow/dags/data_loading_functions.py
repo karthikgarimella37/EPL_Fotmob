@@ -219,13 +219,13 @@ def dim_match_stg(postgres_args, raw_df):
             col("content.matchFacts.QAData").getItem(0).getField("answer")
         ).otherwise(lit(None)).alias("MatchQAAnswer")
     ]
-    print(raw_df.show(20))
-    print(raw_df.count())
-    print(raw_df.select("content.matchFacts.playerOfTheMatch").show(20))
-    match_facts_df = raw_df.select(select_exprs).dropDuplicates(["MatchID"])
+    # raw_df.show(20)
+    # print(raw_df.count())
+    # raw_df.select("content.matchFacts.playerOfTheMatch").show(20)
+    match_facts_df = raw_df.select(select_exprs)#.dropDuplicates(["MatchID"])
 
-    print(match_facts_df.count())
-    print(match_facts_df.show(20))
+    # print(match_facts_df.count())
+    # match_facts_df.show(20)
 
     logger.info(f"Inserting {match_facts_df.count()} matches into match_dim_stg table.")
     write_to_postgres(match_facts_df, 'match_dim_stg', postgres_args)
@@ -328,7 +328,7 @@ def fact_player_shotmap_stg(postgres_args, raw_df):
         explode(col("content.shotmap.shots")).alias("shot")
     )
     print(shotmap_df.count())
-    print(shotmap_df.show(20))
+    shotmap_df.show(20)
     # Check if shotmap data is available in the schema for this file.
     if not "shotmap" in raw_df.select("content.*").columns or \
        not "shots" in raw_df.select("content.shotmap.*").columns:
@@ -398,7 +398,7 @@ def fact_player_stats_stg(postgres_args, raw_df):
         explode(col("content.playerStats")).alias("player_id_str", "player_data")
     )
     print(player_stats_df.count())
-    print(player_stats_df.show(20))
+    player_stats_df.show(20)
     if player_stats_df.rdd.isEmpty():
         logger.info("playerStats data is null or empty. Skipping.")
         return
