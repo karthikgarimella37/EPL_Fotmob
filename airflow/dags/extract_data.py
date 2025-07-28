@@ -60,7 +60,7 @@ def create_fotmob_session(aws_config_loaded=True):
     # Ensure EXTRA_REGIONS has valid regions
     # starting with default regions picked by ApiGateway
     try:
-        gateway = ApiGateway(site=fotmob_base_url, regions=EXTRA_REGIONS) # Using EXTRA_REGIONS as in original code
+        gateway = ApiGateway(site=fotmob_base_url, regions=EXTRA_REGIONS) # Using EXTRA_REGIONS to use multiple regions
         gateway.start(force=True) # force=True can help if gateway is stuck
 
         # Start session
