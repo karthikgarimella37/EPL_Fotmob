@@ -111,13 +111,43 @@ def fetch_all_season_matches(session):
     
     # header has to be modularized or needs to be changed for each new run (once header key expires, I guess)
     headers = {
-"X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9maXh0dXJlcz9pZD0xMTEmc2Vhc29uPTIwMjElMkYyMDIyIiwiY29kZSI6MTc1MzMzODEyMzExOSwiZm9vIjoicHJvZHVjdGlvbjplNTkwMTg4ZTVjZWZkMTkyN2Y1OTcxNzAwYzVlODE3NWRiNzI5Mjg1LXVuZGVmaW5lZCJ9LCJzaWduYXR1cmUiOiIzMjVFRjdCRUMwODRDMEQ5MUFENTMzNEIxQ0NFNjMzRSJ9"
+"X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9hbGxMZWFndWVzP2xvY2FsZT1lbiZjb3VudHJ5PVVTQSIsImNvZGUiOjE3NTM2NTYzMjQ4MjgsImZvbyI6InByb2R1Y3Rpb246ZTU5MDE4OGU1Y2VmZDE5MjdmNTk3MTcwMGM1ZTgxNzVkYjcyOTI4NS11bmRlZmluZWQifSwic2lnbmF0dXJlIjoiNTUwNTQzN0E2QzI0RDY5MzUyRkE2RkMyN0M1N0M4OUYifQ=="
                 }
     # Read all league ids from the file
-    league_ids = []
-    with open('all_league_ids.txt', 'r') as file:
-        for line in file:
-            league_ids.append(line.strip())
+    all_league_url = 'https://www.fotmob.com/api/data/allLeagues'
+    all_league_response = session.get(url = all_league_url, headers = headers)
+    all_league_data = all_league_response.json()
+
+    league_ids = set()
+
+    # Get popular leagues
+    for league in all_league_data.get('popular', []):
+        league_ids.add(league['id'])
+
+    # Get international leagues
+    for section in all_league_data.get('international', []):
+        for league in section.get('leagues', []):
+            print(league['name'], section['name'])
+            if league['id'] in (42, 73, 289, 290, 10216, 44,
+                                50, 78, 10913, 74, 292, 76,
+                                77, 306, 296):
+                league_ids.add(league['id'])
+
+    # Define the list of country codes to include
+    selected_countries = {
+        'ENG', 'FRA', 'GER', 'IND', 
+        'ITA', 'NED', 'ESP', 'USA',
+    }
+
+    # Get leagues from selected countries
+    for country in all_league_data.get('countries', []):
+        if country.get('ccode') in selected_countries:
+            for league in country.get('leagues', []):
+                print(league['name'], country['name'])
+                league_ids.add(league['id'])
+    
+    league_ids = list(league_ids)
+    
     for league_id in league_ids:                
         league_url = f"https://www.fotmob.com/api/data/leagues?id={league_id}"
         league_response = session.get(league_url, headers=headers, timeout=30)
@@ -157,7 +187,7 @@ def fetch_match_details(session, match_id):
     Fetch details of a given match using the provided session
     '''
     headers = {
-    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9maXh0dXJlcz9pZD0xMTEmc2Vhc29uPTIwMjElMkYyMDIyIiwiY29kZSI6MTc1MzMzODEyMzExOSwiZm9vIjoicHJvZHVjdGlvbjplNTkwMTg4ZTVjZWZkMTkyN2Y1OTcxNzAwYzVlODE3NWRiNzI5Mjg1LXVuZGVmaW5lZCJ9LCJzaWduYXR1cmUiOiIzMjVFRjdCRUMwODRDMEQ5MUFENTMzNEIxQ0NFNjMzRSJ9"
+    "X-Mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9hbGxMZWFndWVzP2xvY2FsZT1lbiZjb3VudHJ5PVVTQSIsImNvZGUiOjE3NTM2NTYzMjQ4MjgsImZvbyI6InByb2R1Y3Rpb246ZTU5MDE4OGU1Y2VmZDE5MjdmNTk3MTcwMGM1ZTgxNzVkYjcyOTI4NS11bmRlZmluZWQifSwic2lnbmF0dXJlIjoiNTUwNTQzN0E2QzI0RDY5MzUyRkE2RkMyN0M1N0M4OUYifQ=="
                     }
     url = f"https://www.fotmob.com/api/matchDetails?matchId={match_id}"
     try:
