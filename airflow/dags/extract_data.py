@@ -18,9 +18,8 @@ def aws_credentials(file_path):
     load_dotenv(dotenv_path=file_path) # Ensure .env is loaded
     # The requests_ip_rotator library uses boto3, which will automatically
     # pick up credentials from environment variables like AWS_ACCESS_KEY_ID,
-    # AWS_SECRET_ACCESS_KEY, and AWS_DEFAULT_REGION.
-    # We just need to ensure they are loaded from the .env file if they are set there.
-    # No need to return them explicitly if they are set as env vars.
+    # AWS_SECRET_ACCESS_KEY, and AWS_DEFAULT_REGION..
+    # No need to return them if they are set as env vars.
     os.environ['AWS_ACCESS_KEY_ID'] = os.getenv("aws_access_key_id", "")
     os.environ['AWS_SECRET_ACCESS_KEY'] = os.getenv("aws_secret_access_key", "")
     os.environ['AWS_REGION_NAME'] = os.getenv("aws_default_region", "us-east-1") # requests-ip-rotator might use AWS_REGION_NAME
@@ -57,11 +56,9 @@ def create_fotmob_session(aws_config_loaded=True):
     
     # Initialize the ApiGateway
     # You might need to provide your AWS access keys directly to ApiGateway
-    # if environment variables are not picked up, or configure boto3 session.
-    # Example: gateway = ApiGateway(fotmob_base_url, access_key_id=os.getenv("aws_access_key_id"), access_key_secret=os.getenv("aws_secret_access_key"))
-    
-    # Ensure EXTRA_REGIONS has valid regions if you use it
-    # For simplicity, starting with default regions picked by ApiGateway
+    # if environment variables are not picked up
+    # Ensure EXTRA_REGIONS has valid regions
+    # starting with default regions picked by ApiGateway
     try:
         gateway = ApiGateway(site=fotmob_base_url, regions=EXTRA_REGIONS) # Using EXTRA_REGIONS as in original code
         gateway.start(force=True) # force=True can help if gateway is stuck
@@ -233,7 +230,7 @@ def main():
     file_path = os.path.join(os.path.dirname(__file__), '../.env')
 
     # Load AWS Credentials for IP Rotator
-    aws_credentials(file_path) # Call this early
+    aws_credentials(file_path) # Calling this early to ensure AWS credentials are loaded
 
     # Load GCP Credentials
     GOOGLE_APPLICATION_CREDENTIALS, GCS_BUCKET_NAME = gcp_credentials(file_path)
