@@ -41,12 +41,13 @@ def run():
             Goals are highlighted with a green circle. Other event types are highlighted with different markers as shown in the legend.
 
             **How to use it:**
-            1. **Search for a Player:** Type the player's name in the search bar on the top left.
-            2.  **Select a Player:** Pick the player you want to analyze.
-            3.  **Select an Event:** (optional) Select the event type (saved, goal, etc.) you want to analyze.
-            4.  **Select an Opponent Team:** (optional) Choose the opponent team you want to analyze.
-            5.  **Select a Season:** (optional) Choose the season you want to analyze from the dropdown menu.
-            6.  **Show Heatmap:** (optional) Show the heatmap of the shots.
+            1. **Select a Team:** (optional) Pick the team you want to analyze.
+            2. **Select a Season:** (optional) Choose the season you want to analyze from the dropdown menu.
+            3. **Search for a Player:** Type the player's name in the search bar on the top left.
+            4.  **Select a Player:** Pick the player you want to analyze.
+            5.  **Select an Event:** (optional) Select the event type (saved, goal, etc.) you want to analyze.
+            6.  **Select an Opponent Team:** (optional) Choose the opponent team you want to analyze.
+            7.  **Show Heatmap:** (optional) Show the heatmap of the shots.
         """) 
 
     df = load_shotmap_data()
@@ -61,60 +62,57 @@ def run():
     team_options = sorted(df['playerteamname'].dropna().unique())
     team_filter = st.sidebar.selectbox("Select Team (optional)", ["All"] + team_options)
 
-    # Filter data based on selected team
-    if team_filter != "All":
-        df_for_player_selection = df[df['playerteamname'] == team_filter]
-    else:
-        df_for_player_selection = df
+    # Create a dataframe based on team selection to derive available seasons
+    df_for_season_selection = df[df['playerteamname'] == team_filter] if team_filter != "All" else df
+
+    # Season filter
+    seasons = sorted(df_for_season_selection['seasonname'].dropna().unique(), reverse=True)
+    season_filter = st.sidebar.selectbox(
+        "Season (optional)",
+        ["All"] + seasons,
+        index=0  # Default to "All"
+    )
+
+    # Filter data for player selection based on team and season
+    df_for_player_selection = df_for_season_selection.copy()
+    if season_filter != "All":
+        df_for_player_selection = df_for_player_selection[df_for_player_selection['seasonname'] == season_filter]
 
     player_search = st.sidebar.text_input("🔍 Search Player", "")
-    
+
     if player_search:
         player_options = sorted(df_for_player_selection[df_for_player_selection['playername'].str.contains(player_search, case=False, na=False)]['playername'].unique())
     else:
         player_options = sorted(df_for_player_selection['playername'].dropna().unique())
 
     if not player_options:
-        st.sidebar.warning("No players found with that name for the selected team.")
+        st.sidebar.warning("No players found for the selected filters.")
         st.stop()
-        
+
     # Set default player to Salah, if available
     default_player = "Mohamed Salah"
     player_index = player_options.index(default_player) if default_player in player_options else 0
     player_filter = st.sidebar.selectbox("Select Player", player_options, index=player_index)
-    
+
+    # Get all of the player's data to populate dropdowns for other filters
     player_df = df[df['playername'] == player_filter]
 
     all_event_types = sorted(player_df['eventtype'].dropna().unique())
-    # Set 'Goal' as default if available
-    default_events = None#['Goal'] if 'Goal' in all_event_types else all_event_types
+    default_events = None
     selected_event_types = st.sidebar.multiselect("Event Types", options=all_event_types, default=default_events)
 
     # Determine opponent teams for the selected player
     opponent_teams = sorted(pd.concat([
-        player_df['hometeamname'], 
+        player_df['hometeamname'],
         player_df['awayteamname']
     ]).dropna().unique())
-    
+
     # Filter out the player's own team from the opponent list
     player_team = player_df['playerteamname'].iloc[0] if not player_df.empty else None
     if player_team and player_team in opponent_teams:
         opponent_teams.remove(player_team)
-        
-    opponent_filter = st.sidebar.selectbox("Opponent Team (optional)", ["All"] + opponent_teams)
 
-    # Default season to the latest available for the selected player
-    seasons = sorted(player_df['seasonname'].dropna().unique(), reverse=True)
-    latest_season = seasons[0] if seasons else None
-    
-    # The list includes "All", so we add 1 to the index of the latest season
-    season_index = seasons.index(latest_season) + 1 if latest_season else 0
-    
-    season_filter = st.sidebar.selectbox(
-        "Season (optional)", 
-        ["All"] + seasons, 
-        index=0 # Default to "All" to show all seasons initially
-    )
+    opponent_filter = st.sidebar.selectbox("Opponent Team (optional)", ["All"] + opponent_teams)
 
     show_heatmap = st.sidebar.checkbox("Show Heatmap", value=True)
 
@@ -122,13 +120,16 @@ def run():
     filtered_df = player_df.copy()
     if selected_event_types:
         filtered_df = filtered_df[filtered_df['eventtype'].isin(selected_event_types)]
-    
+
     if opponent_filter != "All":
         # A match is against an opponent if the opponent is either the home or away team
         filtered_df = filtered_df[
-            (filtered_df['hometeamname'] == opponent_filter) | 
+            (filtered_df['hometeamname'] == opponent_filter) |
             (filtered_df['awayteamname'] == opponent_filter)
         ]
+
+    if team_filter != "All":
+        filtered_df = filtered_df[filtered_df['playerteamname'] == team_filter]
 
     if season_filter != "All":
         filtered_df = filtered_df[filtered_df['seasonname'] == season_filter]
