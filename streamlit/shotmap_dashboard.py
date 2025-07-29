@@ -56,15 +56,26 @@ def run():
 
     # --- Sidebar Filters ---
     st.sidebar.header("🎯 Shot Map Filters")
+
+    # Team filter
+    team_options = sorted(df['playerteamname'].dropna().unique())
+    team_filter = st.sidebar.selectbox("Select Team (optional)", ["All"] + team_options)
+
+    # Filter data based on selected team
+    if team_filter != "All":
+        df_for_player_selection = df[df['playerteamname'] == team_filter]
+    else:
+        df_for_player_selection = df
+
     player_search = st.sidebar.text_input("🔍 Search Player", "")
     
     if player_search:
-        player_options = sorted(df[df['playername'].str.contains(player_search, case=False, na=False)]['playername'].unique())
+        player_options = sorted(df_for_player_selection[df_for_player_selection['playername'].str.contains(player_search, case=False, na=False)]['playername'].unique())
     else:
-        player_options = sorted(df['playername'].dropna().unique())
+        player_options = sorted(df_for_player_selection['playername'].dropna().unique())
 
     if not player_options:
-        st.sidebar.warning("No players found with that name.")
+        st.sidebar.warning("No players found with that name for the selected team.")
         st.stop()
         
     # Set default player to Salah, if available

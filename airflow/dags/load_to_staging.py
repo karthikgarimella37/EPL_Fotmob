@@ -895,10 +895,10 @@ def load_to_staging(spark_session, gcs_path, schema, postgres_args):
     # print(raw_df.limit(5).toPandas().columns)
 
     # Load Dim Stg Tables
-    # dim_team_stg(postgres_args, raw_df)
-    # dim_player_stg(postgres_args, raw_df)
+    dim_team_stg(postgres_args, raw_df)
+    dim_player_stg(postgres_args, raw_df)
     dim_match_stg(postgres_args, raw_df)
-    # dim_league_stg(postgres_args, raw_df)
+    dim_league_stg(postgres_args, raw_df)
     # fact_match_lineup_stg(postgres_args, raw_df)
     # fact_player_shotmap_stg(postgres_args, raw_df)
     # fact_player_stats_stg(postgres_args, raw_df)

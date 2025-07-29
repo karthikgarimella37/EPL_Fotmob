@@ -85,19 +85,19 @@ def postgres_connection(file_path):
 
     return engine
 
-def check_current_year_vs_(engine):
-    '''
-    Check if all matches exist in dim_match. If not, get the latest match inserted
-    '''
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT COUNT(*) FROM team_dim"))
-        count = result.scalar()
-        if count == 0:
-            print("No Matches")
-            return None  # No matches exist, fetch all
-        else:
-            last_match = conn.execute(text("SELECT MAX(match_id) FROM team_dim")).scalar()
-            return last_match
+# def check_current_year_vs_(engine):
+#     '''
+#     Check if all matches exist in dim_match. If not, get the latest match inserted
+#     '''
+#     with engine.connect() as conn:
+#         result = conn.execute(text("SELECT COUNT(*) FROM team_dim"))
+#         count = result.scalar()
+#         if count == 0:
+#             print("No Matches")
+#             return None  # No matches exist, fetch all
+#         else:
+#             last_match = conn.execute(text("SELECT MAX(match_id) FROM team_dim")).scalar()
+#             return last_match
         
 
 def fetch_all_season_matches(session):

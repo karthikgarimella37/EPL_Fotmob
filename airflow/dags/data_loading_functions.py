@@ -72,6 +72,7 @@ def dim_team_stg(postgres_args, raw_df):
         "LeagueID"
     ).dropDuplicates(["TeamID"])
 
+    dim_team_stg = dim_team_stg.filter(col("TeamID").isNotNull())
     logger.info(f"Inserting {dim_team_stg.count()} teams into team_dim_stg table.")
 
     write_to_postgres(dim_team_stg, 'team_dim_stg', postgres_args)
@@ -150,6 +151,7 @@ def dim_player_stg(postgres_args, raw_df):
         "ProfileUrl"
     )
     
+    dim_player_stg_df = dim_player_stg_df.filter(col("PlayerID").isNotNull())
     logger.info(f"Inserting {dim_player_stg_df.count()} players into player_dim_stg table.")
 
     write_to_postgres(dim_player_stg_df, 'player_dim_stg', postgres_args)
@@ -226,6 +228,7 @@ def dim_match_stg(postgres_args, raw_df):
 
     # print(match_facts_df.count())
     # match_facts_df.show(20)
+    match_facts_df = match_facts_df.filter(col("MatchID").isNotNull())
 
     logger.info(f"Inserting {match_facts_df.count()} matches into match_dim_stg table.")
     write_to_postgres(match_facts_df, 'match_dim_stg', postgres_args)
@@ -243,6 +246,7 @@ def dim_league_stg(postgres_args, raw_df):
         col("general.countryCode").alias("CountryCode")
     ).dropDuplicates(["LeagueID"])
 
+    league_df = league_df.filter(col("LeagueID").isNotNull())
     logger.info(f"Inserting {league_df.count()} leagues into league_dim_stg table.")
     write_to_postgres(league_df, 'league_dim_stg', postgres_args)
     logger.info(f"Inserted {league_df.count()} leagues into league_dim_stg table.")
