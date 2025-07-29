@@ -208,8 +208,8 @@ def upload_to_gcs(bucket_name, data, destination_blob_name):
     '''
     storage_client = storage.Client()
 
-    client = storage.Client()
-    buckets = list(client.list_buckets())
+    
+    buckets = list(storage_client.list_buckets())
     print("Buckets visible to the client:")
     for b in buckets:
         print("-", b.name)
